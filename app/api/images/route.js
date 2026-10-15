@@ -27,11 +27,18 @@ export async function POST(req) {
   }
 
   export async function GET(request){
+
+    const { searchParams } = new URL(request.url);
+
+    const limit = Math.min(
+      Math.max(parseInt(searchParams.get("limit") || "10", 10) || 10, 1),
+      100
+    );
     try{
       await connectDB()
       
 
-      const media = await Media.find({}).sort({_id:-1})
+      const media = await Media.find({}).sort({_id:-1}).limit(limit);
 
       return NextResponse.json({sucsess: true, data: media})
 

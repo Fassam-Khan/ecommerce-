@@ -36,7 +36,7 @@ export default function BasicModal({ title, onSendToParent }) {
     setfile(e.target.files[0])
   }
 
- 
+
 
   const [Select, setSelect] = useState([])
   const [paintsImages, setpaintsImages] = useState([])
@@ -58,9 +58,7 @@ export default function BasicModal({ title, onSendToParent }) {
 
 
   const handleClick = () => {
-    console.log("May chala");
-    // Call the parent's function and pass data to it
-    onSendToParent(Select);
+    onSendToParent(Select, paintsImages);
   };
 
 
@@ -96,14 +94,17 @@ export default function BasicModal({ title, onSendToParent }) {
 
   }
 
-  const fetchImage = async ()=>{
+
+
+
+  const fetchImage = async () => {
     const res = await axios.get("/api/images?limit=20")
-    if(res){
+    if (res) {
       setpaintsImages(res.data.data)
     }
   }
 
-  
+
 
 
   useEffect(() => {
@@ -144,7 +145,7 @@ export default function BasicModal({ title, onSendToParent }) {
           </Box>
 
           {/* Images Parent  */}
-          <Box className="grid grid-cols-4 px-3 py-3 gap-2 w-full border border-red-200">
+          <Box className="grid grid-cols-4 px-3 py-3 h-[280px] overflow-y-auto gap-2 w-full border border-red-200">
             {paintsImages.map((e) => {
               return <ImgCard key={e._id} data={e} handler={handleCheckBox} check={Select} />
             })}

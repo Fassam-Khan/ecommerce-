@@ -55,68 +55,27 @@ const page = () => {
 
     }
 
-    const formData = new FormData();
-    formData.append("file", Category.file);
+   
 
 
     useEffect(() => {
 
         if (ImgUrl) {
-            console.log(ImgUrl);
             const selectedImg = ImgUrlBC.find((item) => item._id == ImgUrl[0])
-            console.log(selectedImg);
             setcurrentImg(selectedImg)
         }
 
     }, [ImgUrl])
 
-    const fetchImage = async ()=>{
-        const res = await axios.get('/api/images')
-        if(res){
-            setImgUrlBC(res.data.data)
-        }
-      }
+ 
 
-      useEffect(() => {
-        fetchImage()
-       
-
-    }, [])
-
-
-
-
-
-    useEffect(() => {
-        imageUpload(Category.file)
-
-    }, [Category])
-
-
-    const imageUpload = async (data) => {
-        try {
-            if (Category.file) {
-                const response = await axios.post("/api/upload", formData)
-                if (response) {
-                    Category.file = response.data.url
-                    setImgUrl(response.data.url)
-                }
-
-            }
-        } catch (error) {
-            console.log(error);
-
-        }
-    }
 
     const handleChildData = (childData, paintsImages) => {
         setImgUrl(childData)
+        setImgUrlBC(paintsImages)
     };
 
-    useEffect(() => {
-        handleChildData()
-
-    }, [ImgUrl])
+  
 
 
     const submitHandler = async () => {
@@ -125,28 +84,35 @@ const page = () => {
             .trim()
             .replace(/[^\w\s-]/g, "")
             .replace(/\s+/g, "-")}`
-
         try {
             if (!Category.title.trim()) {
                 return toast.warning("Please fill title")
             }
-            Category.file = currentImg?.url
+            Category.file = currentImg?.file
 
-            const res = await axios.post("/api/images?limit=20", Category)
-            console.log(res.data);
+            const res = await axios.post("/api/categories", Category)
+            if(res.data.success){
+                setCategory({
+                    title: "",
+                    description: "",
+                    slug: "",
+                    file: null,
+                  });
+                  
+                  // Reset selected image
+                  setImgUrl([]);
+                  setcurrentImg([]);
+
+                  return  toast.success("Uploaded Successfully")
 
 
-            toast.success("Uploaded Successfully")
-            setCategory({
-                title: "",
-                description: "",
-                slug: "",
-                file: null,
-              });
-              
-              // Reset selected image
-              setImgUrl(null);
-              setcurrentImg(null);
+            }
+            else{
+                toast.error("Something went wrong ")
+            }
+
+
+         
 
 
 
@@ -155,8 +121,7 @@ const page = () => {
             console.log(error);
 
         }
-        console.log("Hello world");
-        console.log(Category);
+
     }
     return (
         <div>
@@ -169,11 +134,11 @@ const page = () => {
 
                     <Box className="w-full flex flex-col gap-4">
                         <Box>
-                            <Input1 name={"title"} type={"text"} handler={changeHandler} placeholder={"Enter title"} width={"100%"} />
+                            <Input1 name="title" value={Category.title} type={"text"} handler={changeHandler} placeholder={"Enter title"} width={"100%"} />
                         </Box>
                         <Box className="flex flex-col gap-1">
                             <label htmlFor="">Enter Description</label>
-                            <textarea name="description" onChange={(e) => changeHandler(e)} id="" cols="25" rows="5" className='px-2 outline outline-gray-300 py-1'></textarea>
+                            <textarea name="description" value={Category.description} onChange={(e) => changeHandler(e)} id="" cols="25" rows="5" className='px-2 outline outline-gray-300 py-1'></textarea>
                         </Box>
 
                         <Box className="">
