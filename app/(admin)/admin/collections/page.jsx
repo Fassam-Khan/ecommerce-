@@ -1,5 +1,6 @@
 import CollectionTable from '@/components/CollectionTable'
 import DarkBtn from '@/components/DarkBtn'
+import MyTable from '@/components/MyTable'
 import TablePag from '@/components/TablePag'
 import Link from 'next/link'
 import React from 'react'
@@ -18,7 +19,8 @@ const page = () => {
       </div>
 
       {/* Table  */}
-      <CollectionTable/>
+      <MyTable/>
+      {/* <CollectionTable/> */}
 
 
 
