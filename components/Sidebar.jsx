@@ -35,7 +35,7 @@ export default function Sidebar() {
     {
       name: "Add Products",
       id:4,
-      slug:"",
+      slug:"/admin/products/new",
       icon:""
     },
     {
@@ -44,7 +44,7 @@ export default function Sidebar() {
       slug:"/admin/collections",
       icon:""
     },
-    {
+    { 
       name: "Add Collection",
       id:6,
       slug:"/admin/collections/new",

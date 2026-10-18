@@ -19,11 +19,11 @@ export const metadata = {
 
 export default function DashboardLayout({ children }) {
   return (
-    <div className=" flex bg-[#0A0A0A] ">
+    <div className=" flex bg-[#0A0A0A] overflow-hidden">
       <div className="bg-[#0A0A0A] w-[18%] h-screen text-gray-200 ">
         <Sidebar className=""/>  
       </div>
-      <div className="rounded-2xl w-full bg-white px-4 py-2 ">
+      <div className="rounded-2xl w-full bg-white px-4 py-2 overflow-y-auto h-screen ">
       {children}
       </div>
       

@@ -137,3 +137,54 @@ export async function PUT(request, { params }) {
         );
     }
 }
+
+export async function DELETE(request, { params }) {
+    try {
+        await connectDB();
+
+        const { id } = await params;
+
+        // Validate MongoDB ID
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    message: "Invalid collection ID",
+                },
+                { status: 400 }
+            );
+        }
+
+        // Delete collection from MongoDB
+        const deletedCategory = await Category.findByIdAndDelete(id);
+
+        if (!deletedCategory) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    message: "Collection not found",
+                },
+                { status: 404 }
+            );
+        }
+
+        return NextResponse.json(
+            {
+                success: true,
+                message: "Collection deleted successfully",
+                category: deletedCategory,
+            },
+            { status: 200 }
+        );
+    } catch (error) {
+        console.error("DELETE category error:", error);
+
+        return NextResponse.json(
+            {
+                success: false,
+                message: "Failed to delete collection",
+            },
+            { status: 500 }
+        );
+    }
+}

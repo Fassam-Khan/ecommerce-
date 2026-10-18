@@ -55,10 +55,16 @@ export default function BasicModal({ title, onSendToParent }) {
 
 
   const selectedImg = paintsImages.find((item) => item.id == Select[0])
+  const multipleImages = paintsImages.filter((item) => Select.includes(item._id))
+
+  
+
+  
+
 
 
   const handleClick = () => {
-    onSendToParent(Select, paintsImages);
+    onSendToParent(Select, paintsImages, multipleImages);
   };
 
 
