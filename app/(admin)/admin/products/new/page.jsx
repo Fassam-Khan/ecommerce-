@@ -14,6 +14,8 @@ const page = () => {
     const [ImagesData, setImagesData] = useState([])
     const [SelectImages, setSelectImages] = useState([])
     const [finalImage, setfinalImage] = useState([])
+    const [isImgChange, setisImgChange] = useState(false)
+    const [CHangeImg, setCHangeImg] = useState(0)
 
 
 
@@ -22,6 +24,20 @@ const page = () => {
         setImagesData(paintsImages)
         setSelectImages(multipleImages)
     };
+
+    const changeImage= (id)=>{
+        console.log(id);
+        setisImgChange(true)
+        setCHangeImg(id)
+    }
+
+    const deleteImg =()=>{
+        console.log(SelectImages);
+        console.log(CHangeImg);
+      const remove =  SelectImages.filter((item)=> item._id != CHangeImg )
+      setSelectImages(remove)
+
+    }
     return (
         <div>
             {/* top Head  */}
@@ -63,11 +79,20 @@ const page = () => {
                         {/* Media  */}
                         <Box className="mt-4">
                             <p className='text-sm font-semibold mb-3'>Media</p>
+                            {isImgChange && (
+                                    <button onClick={deleteImg} >Remove</button>
+                                )}
                             <div className="flex gap-2 flex-wrap">
+                               
 
                                 {SelectImages.length > 0 ? <>  {SelectImages.map((e) => {
-                                    return <div  className="border border-gray-300">
-                                            <Image src={e.file} width={150} height={150} alt='l' /></div>
+                                    return <div  className="border relative border-gray-300 group hover:bg-gray-200">
+                                            <Image src={e.file} width={150} height={150} alt='l' />
+                                            <div className="absolute top-2 left-2 hidden group-hover:flex  ">
+                                                <input type="checkbox" onClick={()=> changeImage(e._id)}  />
+                                            </div >
+                                            
+                                            </div>
 
                                    
                                          
