@@ -21,7 +21,7 @@ const style = {
   boxShadow: 24,
 };
 
-export default function BasicModal({ title, onSendToParent }) {
+export default function BasicModal({ title, onSendToParent , isVarient}) {
   const [open, setOpen] = React.useState(false);
   const [Loading, setLoading] = useState(false)
   const handleOpen = () => setOpen(true);
@@ -64,7 +64,7 @@ export default function BasicModal({ title, onSendToParent }) {
 
 
   const handleClick = () => {
-    onSendToParent(Select, paintsImages, multipleImages);
+    onSendToParent(Select, paintsImages, multipleImages , isVarient,selectedImg);
   };
 
 
