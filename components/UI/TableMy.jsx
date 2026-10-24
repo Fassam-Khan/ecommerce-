@@ -1,65 +1,124 @@
-import Image from 'next/image'
-import Link from 'next/link'
-import React from 'react'
+"use client";
+
+import { useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 const TableMy = () => {
-    return (
-        <div>
-            <table className='rounded-2xl w-full '>
-                <thead className='bg-[#D1D5DC] '>
-                    <tr className='rounded-md'>
-                        <td className='w-[2%] px-3 py-0.5 '><input type="checkbox" /></td>
-                        <td className='w-[6%] px-3 py-0.5 '>Images</td>
-                        <td className='w-[20%] px-3 py-0.5 '>Products</td>
-                        <td className='w-[2%] px-3 py-0.5 '>Status</td>
-                        <td className='w-[14%] px-3 py-0.5 '>Inventory</td>
-                        <td className='w-[15%] px-3 py-0.5 '>Brand</td>
-                        <td className='w-[5%] px-3 py-0.5 '></td>
+  const [page, setPage] = useState(1);
 
-                    </tr>
-                </thead>
+  // Records displayed per page
+  const limit = 50;
 
-                <tbody>
-               
+  // Example: total products in your database
+  const totalProducts = 200;
 
+  const totalPages = Math.ceil(totalProducts / limit);
 
-                    <tr>
-                        <td className='w-[30px] px-3 py-0.5 '><input type="checkbox" /></td>
-                        <td className='w-[7%] px-3 py-0.5 '>
-                            <div className='border flex just-fy-center items-center w-[40px] h-[40px]'>
-                                <Image src={'/imageholder.png'} width={40} height={40} />
-                            </div>
-                        </td>
-                        <td className=' px-3 py-0.5 '>
-                            <Link href={'/admin/products'}>
-                                <p className='text-sm font-semibold'>Acryjsh hshv</p>
-                            </Link>
-                        </td>
-                        <td className=' px-3 py-0.5   '>
-                            <div className='bg-green-500 px-2 py-0.5 flex justify-center items-center'>
-                                <p className='text-[10px] font-semibold'>Active</p>
-                            </div>
+  const initial = (page - 1) * limit + 1;
+  const final = Math.min(page * limit, totalProducts);
 
-                        </td>
-                        <td className=' px-3 py-0.5 '>
-                                <p className='text-sm font-semibold'>Acryjsh hshv</p>
-                        </td>
-                        <td className=' px-3 py-0.5 '>
-                                <p className='text-sm font-semibold'>Keep SMiling</p>
-                        </td>
-                        <td className=' px-3 py-0.5 '>
-                            <Link href={'/admin/products'}>
-                                <p className='text-sm font-semibold'>View</p>
-                                </Link>
-                        </td>
+  const increment = () => {
+    if (page < totalPages) {
+      setPage((prev) => prev + 1);
+    }
+  };
 
+  const decrement = () => {
+    if (page > 1) {
+      setPage((prev) => prev - 1);
+    }
+  };
 
-                    </tr>
-                </tbody>
-            </table>
+  return (
+    <div className="w-full">
+      <table className="w-full rounded-2xl">
+        <thead className="bg-[#D1D5DC]">
+          <tr>
+            <th className="px-3 py-2 text-left">
+              <input type="checkbox" />
+            </th>
+            <th className="px-3 py-2 text-left">Images</th>
+            <th className="px-3 py-2 text-left">Products</th>
+            <th className="px-3 py-2 text-left">Status</th>
+            <th className="px-3 py-2 text-left">Inventory</th>
+            <th className="px-3 py-2 text-left">Brand</th>
+            <th className="px-3 py-2 text-left"></th>
+          </tr>
+        </thead>
 
+        <tbody>
+          {/* Example row — replace with your mapped product data */}
+          <tr className="border-b">
+            <td className="px-3 py-2">
+              <input type="checkbox" />
+            </td>
+
+            <td className="px-3 py-2">
+              <div className="flex h-10 w-10 items-center justify-center border">
+                <Image
+                  src="/imageholder.png"
+                  alt="Product"
+                  width={40}
+                  height={40}
+                />
+              </div>
+            </td>
+
+            <td className="px-3 py-2">
+              <Link href="/admin/products">
+                <p className="text-sm font-semibold">Acryjsh hshv</p>
+              </Link>
+            </td>
+
+            <td className="px-3 py-2">
+              <span className="rounded bg-green-500 px-2 py-1 text-xs">
+                Active
+              </span>
+            </td>
+
+            <td className="px-3 py-2">
+              <p className="text-sm font-semibold">In stock</p>
+            </td>
+
+            <td className="px-3 py-2">
+              <p className="text-sm font-semibold">Keep SMiling</p>
+            </td>
+
+            <td className="px-3 py-2">
+              <Link href="/admin/products">View</Link>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* Pagination footer */}
+      <div className="fixed bottom-3 left-1/2 -translate-x-1/2 rounded-xl border bg-white p-2 shadow-2xl">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={decrement}
+            disabled={page === 1}
+            className="flex cursor-pointer items-center justify-center rounded-full p-2 hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-30"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+
+          <p className="whitespace-nowrap text-xs font-semibold">
+            {totalProducts === 0 ? 0 : initial}-{final} of {totalProducts}
+          </p>
+
+          <button
+            onClick={increment}
+            disabled={page === totalPages || totalPages === 0}
+            className="flex cursor-pointer items-center justify-center rounded-full p-2 hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-30"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
         </div>
-    )
-}
+      </div>
+    </div>
+  );
+};
 
-export default TableMy
+export default TableMy;
