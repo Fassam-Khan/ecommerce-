@@ -33,6 +33,12 @@ export default function Sidebar() {
       icon: <LoyaltyIcon sx={{width:"20px"}}/>
     },
     {
+      name: "All Products",
+      id:9,
+      slug:"/admin/products",
+      icon:""
+    },
+    {
       name: "Add Products",
       id:4,
       slug:"/admin/products/new",
