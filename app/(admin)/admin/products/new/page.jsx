@@ -8,12 +8,28 @@ import RichTextEditor from '@/components/RichTextEditor'
 import Images from "@/components/Images"
 import Image from 'next/image'
 import Toggle from '@/components/Toggle'
-import axios from 'axios' 
-import {toast , ToastContainer} from "react-toastify"
+import axios from 'axios'
+import { toast, ToastContainer } from "react-toastify"
+// Needed for react-toastify v10 and below. Remove this line if you use v11+.
+import 'react-toastify/dist/ReactToastify.css'
 
 const emptyValue = { optionName: '', img_url: '', price: '', stock: '' }
 
-const initialForm = {
+// "My New Product!" -> "my-new-product"
+const slugify = (text = '') =>
+    text
+        .toString()
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9\s-]/g, '')   // remove special characters
+        .replace(/[\s_-]+/g, '-')       // spaces/underscores -> single hyphen
+        .replace(/^-+|-+$/g, '')        // trim hyphens from both ends
+
+const META_TITLE_LIMIT = 60
+const META_DESC_LIMIT = 160
+
+// Factory function so every reset gets fresh nested objects/arrays
+const getInitialForm = () => ({
     title: "",
     description: "",
     img_url: [],            // main media: [{ _id, file }]
@@ -23,6 +39,9 @@ const initialForm = {
     stock: "",
     sku: "",
     barcode: "",
+    slug: "",
+    metaTitle: "",
+    metaDescription: "",
     status: "draft",
     collection: [],
     varient: [
@@ -31,33 +50,47 @@ const initialForm = {
             optionValues: [{ ...emptyValue }]
         }
     ]
+})
+
+// ---------- image upload helper ----------
+// Blob/data URLs only exist in the browser, so they must be uploaded
+// before saving. Adjust the endpoint + response shape to match your API.
+const uploadIfLocal = async (src) => {
+    if (!src || typeof src !== 'string') return src
+    if (!src.startsWith('blob:') && !src.startsWith('data:')) return src // already a real URL
+
+    const blob = await (await fetch(src)).blob()
+    const fd = new FormData()
+    fd.append('file', blob, 'image.' + (blob.type.split('/')[1] || 'png'))
+
+    const res = await axios.post('/api/upload', fd)
+    return res.data.url // expected: { url: "https://..." }
 }
 
 const Page = () => {
     // ---------- main form (single source of truth) ----------
-    const [Form, setForm] = useState(initialForm)
+    const [Form, setForm] = useState(getInitialForm)
 
     // ---------- UI-only state ----------
     const [selectedIds, setSelectedIds] = useState([])
     const [isVarient, setisVarient] = useState(false)
-
-    // available collections (yahan apna data / API ka data rakho)
-
-    const [Collections, setCollections] = useState([
-       
-    ])
+    const [saving, setSaving] = useState(false)
+    // once the user types their own slug, stop auto-generating it from the title
+    const [slugEdited, setSlugEdited] = useState(false)
+    const [Collections, setCollections] = useState([])
 
     useEffect(() => {
         async function getCollections() {
-             const res = await axios.get("/api/categories")
-             setCollections(res.data.data)
-            
+            try {
+                const res = await axios.get("/api/categories")
+                setCollections(res.data.data || [])
+            } catch (error) {
+                console.log(error)
+                toast.error("Failed to load collections")
+            }
         }
-
         getCollections()
-    
     }, [])
-  
 
     // shortcuts for variant data
     const optionName = Form.varient[0].varientName
@@ -73,21 +106,45 @@ const Page = () => {
     const profit = price - cost
     const margin = price > 0 ? (profit / price) * 100 : 0
 
-    // ---------- generic fields (title, price, costPrice, stock, sku, barcode) ----------
+    // ---------- generic fields ----------
     const changeHandler = (e) => {
         const { name, value } = e.target
-        setForm(prev => ({ ...prev, [name]: value }))
+        setForm(prev => ({
+            ...prev,
+            [name]: value,
+            // keep slug in sync with title until the user edits it manually
+            ...(name === 'title' && !slugEdited ? { slug: slugify(value) } : {})
+        }))
+    }
+
+    // ---------- slug ----------
+    const handleSlugChange = (e) => {
+        setSlugEdited(true)
+        // allow typing hyphens mid-way; final cleanup happens on blur/submit
+        const value = e.target.value
+            .toLowerCase()
+            .replace(/\s+/g, '-')
+            .replace(/[^a-z0-9-]/g, '')
+        setForm(prev => ({ ...prev, slug: value }))
+    }
+
+    const handleSlugBlur = () => {
+        setForm(prev => ({ ...prev, slug: slugify(prev.slug) }))
+    }
+
+    const resetSlugFromTitle = () => {
+        setSlugEdited(false)
+        setForm(prev => ({ ...prev, slug: slugify(prev.title) }))
     }
 
     // ---------- description ----------
-    // RichTextEditor must call onChange with the HTML string
     const handleDescription = (html) => {
         setForm(prev => ({ ...prev, description: html }))
     }
 
     // ---------- main media ----------
     const handleChildData = (childData, paintsImages, multipleImages) => {
-        setForm(prev => ({ ...prev, img_url: multipleImages }))
+        setForm(prev => ({ ...prev, img_url: multipleImages || [] }))
     }
 
     const toggleSelect = (id) => {
@@ -163,12 +220,16 @@ const Page = () => {
         handleValueChange(index, 'img_url', file)
     }
 
+    const removeVariantImage = (index) => {
+        handleValueChange(index, 'img_url', '')
+    }
+
     // ---------- status ----------
     const handleStatus = (e) => {
         setForm(prev => ({ ...prev, status: e.target.value }))
     }
 
-    // ---------- collections (multi select, slug save hota hai) ----------
+    // ---------- collections (multi select, slug is saved) ----------
     const toggleCollection = (slug) => {
         setForm(prev => ({
             ...prev,
@@ -180,48 +241,97 @@ const Page = () => {
 
     // ---------- submit ----------
     const submitData = async () => {
+        if (saving) return
+
+        // validation
         if (!Form.title.trim()) {
-            alert('Title is required')
+            toast.error('Title is required')
             return
         }
-        if (Form.price === '') {
-            alert('Price is required')
+        const finalSlug = slugify(Form.slug || Form.title)
+        if (!finalSlug) {
+            toast.error('Slug is required')
+            return
+        }
+        if (Form.price === '' || Number(Form.price) < 0) {
+            toast.error('Enter a valid price')
+            return
+        }
+        if (Form.costPrice !== '' && Number(Form.costPrice) < 0) {
+            toast.error('Cost price cannot be negative')
+            return
+        }
+        if (Form.isInventoryTrack && Form.stock !== '' && Number(Form.stock) < 0) {
+            toast.error('Stock cannot be negative')
+            return
+        }
+        if (isVarient && filledVariants.length > 0 && !optionName.trim()) {
+            toast.error('Give the option a name (e.g. Size, Color)')
             return
         }
 
-        const payload = {
-            ...Form,
-            price: Number(Form.price) || 0,
-            costPrice: Number(Form.costPrice) || 0,
-            stock: Form.isInventoryTrack ? Number(Form.stock) || 0 : 0,
-            varient: isVarient && filledVariants.length > 0
-                ? [{
-                    varientName: optionName,
-                    optionValues: filledVariants.map(v => ({
-                        ...v,
-                        price: Number(v.price) || 0,
-                        stock: Number(v.stock) || 0
-                    }))
-                }]
-                : []
+        setSaving(true)
+        try {
+            // 1) upload local images -> permanent URLs
+            const uploadedMain = await Promise.all(
+                Form.img_url.map(async (item) => ({
+                    ...item,
+                    file: await uploadIfLocal(item.file)
+                }))
+            )
+
+            const uploadedVariants = await Promise.all(
+                filledVariants.map(async (v) => ({
+                    ...v,
+                    img_url: await uploadIfLocal(v.img_url),
+                    price: Number(v.price) || 0,
+                    // variant stock only counts when inventory tracking is on
+                    stock: Form.isInventoryTrack ? Number(v.stock) || 0 : 0
+                }))
+            )
+
+            // 2) build payload
+            const payload = {
+                ...Form,
+                sku: Form.sku.trim() || undefined,
+                barcode: Form.barcode.trim() || undefined,
+                slug: finalSlug,
+                metaTitle: Form.metaTitle.trim(),
+                metaDescription: Form.metaDescription.trim(),
+                img_url: uploadedMain,
+                price: Number(Form.price) || 0,
+                costPrice: Number(Form.costPrice) || 0,
+                stock: Form.isInventoryTrack ? Number(Form.stock) || 0 : 0,
+                varient: isVarient && uploadedVariants.length > 0
+                    ? [{ varientName: optionName, optionValues: uploadedVariants }]
+                    : []
+            }
+
+            // 3) save
+            const res = await axios.post("/api/products", payload)
+
+            if (res.data.success) {
+                toast.success("Product created successfully")
+                setForm(getInitialForm())
+                setisVarient(false)
+                setSelectedIds([])
+                setSlugEdited(false)
+            } else {
+                toast.error(res.data.message || "Failed to create product")
+            }
+        } catch (error) {
+            console.log(error)
+            toast.error(error.response?.data?.message || "Failed to create product")
+        } finally {
+            setSaving(false)
         }
-
-        console.log(payload)
-        // TODO: yahan API call lagao, e.g.
-        // await fetch('/api/products', { method: 'POST', body: JSON.stringify(payload) })
-        const res = await axios.post("/api/products", payload);
-
-        if (res.data.success) {
-          toast.success("Product created successfully");
-          setForm(initialForm)
-        };
     }
 
     return (
         <div>
             {/* top Head  */}
             <div className='flex gap-3'>
-                <Link href={'/admin/products'}>
+                <Link href={'/admin/products'} aria-label="Back to products">
                     <div className='relative group w-5 hover:bg-gray-300 transition-all h-5 flex justify-center items-center p-0.5 cursor-pointer rounded-full border border-gray-300'>
                         <ChevronLeft />
                         <div className='group-hover:flex absolute hidden top-5 bg-black text-white font-semibold text-[10px] px-2 py-1 rounded-2xl'>
@@ -276,6 +386,7 @@ const Page = () => {
                                         >
                                             <input
                                                 type="checkbox"
+                                                aria-label="Select image"
                                                 checked={selectedIds.includes(e._id)}
                                                 onChange={() => toggleSelect(e._id)}
                                             />
@@ -300,17 +411,22 @@ const Page = () => {
                             <div className="flex gap-4 mt-4">
                                 <div className="flex gap-2 items-center mt-2">
                                     <p className="text-sm font-semibold">Profit</p>
-                                    <div className="min-w-[40px] px-2 h-5 bg-gray-300 text-[10px] flex justify-center items-center rounded-2xl">
+                                    <div className={`min-w-[40px] px-2 h-5 text-[10px] flex justify-center items-center rounded-2xl ${hasPriceData && profit < 0 ? 'bg-red-200 text-red-700' : 'bg-gray-300'}`}>
                                         {hasPriceData ? profit.toFixed(2) : '-'}
                                     </div>
                                 </div>
                                 <div className="flex gap-2 items-center mt-2">
                                     <p className="text-sm font-semibold">Margin</p>
-                                    <div className="min-w-[40px] px-2 h-5 bg-gray-300 text-[10px] flex justify-center items-center rounded-2xl">
+                                    <div className={`min-w-[40px] px-2 h-5 text-[10px] flex justify-center items-center rounded-2xl ${hasPriceData && profit < 0 ? 'bg-red-200 text-red-700' : 'bg-gray-300'}`}>
                                         {hasPriceData && price > 0 ? `${margin.toFixed(1)}%` : '-'}
                                     </div>
                                 </div>
                             </div>
+                            {hasPriceData && profit < 0 && (
+                                <p className="text-[10px] text-red-600 mt-2">
+                                    Cost price is higher than selling price.
+                                </p>
+                            )}
                         </Box>
                     </Paper>
 
@@ -362,8 +478,9 @@ const Page = () => {
                                 <div className="border rounded border-gray-300 px-3 py-3">
                                     {/* Option Name */}
                                     <div className="flex flex-col gap-2">
-                                        <p className="text-[12px] font-semibold">Option Name</p>
+                                        <label htmlFor="option-name" className="text-[12px] font-semibold">Option Name</label>
                                         <input
+                                            id="option-name"
                                             type="text"
                                             placeholder="e.g., Size, Color"
                                             value={optionName}
@@ -380,6 +497,7 @@ const Page = () => {
                                             <div key={index} className="relative flex items-center">
                                                 <input
                                                     type="text"
+                                                    aria-label={`Option value ${index + 1}`}
                                                     placeholder="e.g., Small, Red"
                                                     value={val.optionName}
                                                     onChange={(e) => handleValueChange(index, 'optionName', e.target.value)}
@@ -419,20 +537,30 @@ const Page = () => {
                                 <table className="w-full mt-4">
                                     <thead className="bg-gray-300">
                                         <tr>
-                                            <td className="text-sm font-semibold px-4 py-1"><input type="checkbox" /></td>
                                             <td className="text-sm font-semibold px-4 py-1">{optionName || 'Variant'}</td>
                                             <td className="text-sm font-semibold px-4 py-1">Price</td>
-                                            <td className="text-sm font-semibold px-4 py-1">Available</td>
+                                            {Form.isInventoryTrack && (
+                                                <td className="text-sm font-semibold px-4 py-1">Available</td>
+                                            )}
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {optionValues.map((v, index) =>
                                             v.optionName.trim() === '' ? null : (
                                                 <tr key={index}>
-                                                    <td className="px-4 py-1 w-[6%]"><input type="checkbox" /></td>
                                                     <td className="flex gap-2 px-4 py-1 items-center">
                                                         {v.img_url ? (
-                                                            <Image src={v.img_url} width={30} height={30} alt={v.optionName} unoptimized />
+                                                            <div className="relative group">
+                                                                <Image src={v.img_url} width={30} height={30} alt={v.optionName} unoptimized />
+                                                                <button
+                                                                    type="button"
+                                                                    aria-label="Remove variant image"
+                                                                    onClick={() => removeVariantImage(index)}
+                                                                    className="absolute -top-1 -right-1 hidden group-hover:flex w-3.5 h-3.5 items-center justify-center rounded-full bg-red-500 text-white text-[9px] leading-none cursor-pointer"
+                                                                >
+                                                                    ×
+                                                                </button>
+                                                            </div>
                                                         ) : (
                                                             <div className="w-[35px] h-[35px] flex justify-center items-center border">
                                                                 <Images
@@ -449,21 +577,27 @@ const Page = () => {
                                                     <td>
                                                         <input
                                                             type="number"
+                                                            min="0"
+                                                            aria-label={`Price for ${v.optionName}`}
                                                             placeholder="Rs"
                                                             value={v.price}
                                                             onChange={(e) => handleValueChange(index, 'price', e.target.value)}
                                                             className="outline-gray-300 rounded-lg px-4 text-[12px] outline py-1"
                                                         />
                                                     </td>
-                                                    <td>
-                                                        <input
-                                                            type="number"
-                                                            placeholder="0"
-                                                            value={v.stock}
-                                                            onChange={(e) => handleValueChange(index, 'stock', e.target.value)}
-                                                            className="outline-gray-300 rounded-lg px-4 text-[12px] outline py-1"
-                                                        />
-                                                    </td>
+                                                    {Form.isInventoryTrack && (
+                                                        <td>
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                aria-label={`Stock for ${v.optionName}`}
+                                                                placeholder="0"
+                                                                value={v.stock}
+                                                                onChange={(e) => handleValueChange(index, 'stock', e.target.value)}
+                                                                className="outline-gray-300 rounded-lg px-4 text-[12px] outline py-1"
+                                                            />
+                                                        </td>
+                                                    )}
                                                 </tr>
                                             )
                                         )}
@@ -473,14 +607,99 @@ const Page = () => {
                         </Box>
                     </Paper>
 
+                    {/* Search engine listing (SEO) */}
+                    <p className='text-sm font-semibold mt-6'>Search engine listing</p>
+
+                    <Paper className="w-full rounded-lg bg-white px-3 mt-4 py-3">
+                        <Box>
+                            {/* Preview */}
+                            <div className="border border-gray-200 rounded-lg px-3 py-2 mb-4">
+                                <p className="text-[14px] text-blue-700 truncate">
+                                    {Form.metaTitle.trim() || Form.title.trim() || 'Product title'}
+                                </p>
+                                <p className="text-[11px] text-green-700 truncate">
+                                    yourstore.com/products/{Form.slug || 'product-slug'}
+                                </p>
+                                <p className="text-[11px] text-gray-600 line-clamp-2">
+                                    {Form.metaDescription.trim() || 'Add a meta description to control how this product appears in search results.'}
+                                </p>
+                            </div>
+
+                            {/* Meta title */}
+                            <div className="flex flex-col gap-2">
+                                <div className="flex justify-between items-center">
+                                    <label htmlFor="meta-title" className="text-[12px] font-semibold">Meta title</label>
+                                    <span className={`text-[10px] ${Form.metaTitle.length > META_TITLE_LIMIT ? 'text-red-600' : 'text-gray-500'}`}>
+                                        {Form.metaTitle.length}/{META_TITLE_LIMIT}
+                                    </span>
+                                </div>
+                                <input
+                                    id="meta-title"
+                                    type="text"
+                                    name="metaTitle"
+                                    placeholder="Defaults to product title"
+                                    value={Form.metaTitle}
+                                    onChange={changeHandler}
+                                    className="outline-gray-300 rounded-lg w-full px-4 text-[12px] outline py-1"
+                                />
+                            </div>
+
+                            {/* Meta description */}
+                            <div className="flex flex-col gap-2 mt-4">
+                                <div className="flex justify-between items-center">
+                                    <label htmlFor="meta-description" className="text-[12px] font-semibold">Meta description</label>
+                                    <span className={`text-[10px] ${Form.metaDescription.length > META_DESC_LIMIT ? 'text-red-600' : 'text-gray-500'}`}>
+                                        {Form.metaDescription.length}/{META_DESC_LIMIT}
+                                    </span>
+                                </div>
+                                <textarea
+                                    id="meta-description"
+                                    name="metaDescription"
+                                    rows={3}
+                                    placeholder="Short summary shown in search results"
+                                    value={Form.metaDescription}
+                                    onChange={changeHandler}
+                                    className="outline-gray-300 rounded-lg w-full px-4 text-[12px] outline py-1 resize-none"
+                                />
+                            </div>
+
+                            {/* Slug */}
+                            <div className="flex flex-col gap-2 mt-4">
+                                <div className="flex justify-between items-center">
+                                    <label htmlFor="slug" className="text-[12px] font-semibold">URL slug</label>
+                                    {slugEdited && (
+                                        <button
+                                            type="button"
+                                            onClick={resetSlugFromTitle}
+                                            className="text-[10px] text-blue-600 hover:underline cursor-pointer"
+                                        >
+                                            Generate from title
+                                        </button>
+                                    )}
+                                </div>
+                                <input
+                                    id="slug"
+                                    type="text"
+                                    name="slug"
+                                    placeholder="my-product-name"
+                                    value={Form.slug}
+                                    onChange={handleSlugChange}
+                                    onBlur={handleSlugBlur}
+                                    className="outline-gray-300 rounded-lg w-full px-4 text-[12px] outline py-1"
+                                />
+                            </div>
+                        </Box>
+                    </Paper>
+
                     {/* Save */}
                     <div className="flex justify-end mt-6 mb-10">
                         <button
                             type="button"
                             onClick={submitData}
-                            className="bg-black text-white text-sm font-semibold px-5 py-2 rounded-lg cursor-pointer hover:bg-gray-800 transition-colors"
+                            disabled={saving}
+                            className="bg-black text-white text-sm font-semibold px-5 py-2 rounded-lg cursor-pointer hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            Save product
+                            {saving ? 'Saving...' : 'Save product'}
                         </button>
                     </div>
                 </div>
@@ -491,6 +710,7 @@ const Page = () => {
                         <Box>
                             <h2 className="text-sm font-semibold mb-2">Status</h2>
                             <select
+                                aria-label="Product status"
                                 value={Form.status}
                                 onChange={handleStatus}
                                 className="w-full outline outline-gray-300 rounded-lg px-3 py-1 text-[12px] bg-white"
@@ -536,7 +756,7 @@ const Page = () => {
                     </Paper>
                 </div>
             </div>
-            <ToastContainer/>
+            <ToastContainer />
         </div>
     )
 }

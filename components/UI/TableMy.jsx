@@ -1,15 +1,39 @@
 "use client";
 
-import { useState } from "react";
+import { useState , useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import axios from "axios";
 
 const TableMy = () => {
   const [page, setPage] = useState(1);
-
+  const [Data, setData] = useState([])
   // Records displayed per page
   const limit = 50;
+  
+
+  const getProducts = async ()=>{
+    try{
+      const res = await axios.get(`/api/products?limit=${limit}`)
+    setData(res.data.data)
+
+  
+
+    }catch(error){
+      console.log(error.message)
+
+    }
+    
+  }
+
+
+  useEffect(() => {
+    getProducts()
+  
+  }, [])
+
+  
 
   // Example: total products in your database
   const totalProducts = 200;
@@ -50,7 +74,8 @@ const TableMy = () => {
 
         <tbody>
           {/* Example row — replace with your mapped product data */}
-          <tr className="border-b">
+          {Data.map((e)=>{
+            return <tr className="border-b" key={e._id}>
             <td className="px-3 py-2">
               <input type="checkbox" />
             </td>
@@ -58,7 +83,7 @@ const TableMy = () => {
             <td className="px-3 py-2">
               <div className="flex h-10 w-10 items-center justify-center border">
                 <Image
-                  src="/imageholder.png"
+                  src={e?.img_url[0]?.file ||"/imageholder.png"}
                   alt="Product"
                   width={40}
                   height={40}
@@ -67,15 +92,18 @@ const TableMy = () => {
             </td>
 
             <td className="px-3 py-2">
-              <Link href="/admin/products">
-                <p className="text-sm font-semibold">Acryjsh hshv</p>
+              <Link href={`/admin/products/${e._id}`}>
+                <p className="text-sm font-semibold">{e.title}</p>
               </Link>
             </td>
 
             <td className="px-3 py-2">
-              <span className="rounded bg-green-500 px-2 py-1 text-xs">
+              {e.status == "active" ?   <span className="rounded bg-green-500 px-2 py-1 text-xs">
                 Active
-              </span>
+              </span> :   <span className="rounded bg-blue-500 px-2 py-1 text-xs">
+                Draft
+              </span>}
+            
             </td>
 
             <td className="px-3 py-2">
@@ -87,9 +115,11 @@ const TableMy = () => {
             </td>
 
             <td className="px-3 py-2">
-              <Link href="/admin/products">View</Link>
+              <Link href={''}>View</Link>
             </td>
           </tr>
+          })}
+          
         </tbody>
       </table>
 

@@ -29,20 +29,7 @@ export async function POST(request) {
       );
     }
 
-    const product = await Product.create({
-      title: body.title.trim(),
-      description: body.description ?? "",
-      img_url: body.img_url ?? [],
-      price: Number(body.price),
-      costPrice: Number(body.costPrice || 0),
-      isInventoryTrack: body.isInventoryTrack ?? false,
-      stock: Number(body.stock || 0),
-      sku: body.sku ?? "",
-      barcode: body.barcode ?? "",
-      status: body.status ?? "draft",
-      collection: body.collection ?? [],
-      varient: body.varient ?? [],
-    });
+    const product = await Product.create(body);
 
     return NextResponse.json(
       {
@@ -62,60 +49,88 @@ export async function POST(request) {
   }
 }
 
-export async function GET(request) {
+// export async function GET(request) {
+//   try {
+//     await connectDB();
+
+//     const { searchParams } = new URL(request.url);
+
+//     const page = Math.max(
+//       1,
+//       parseInt(searchParams.get("page") || "1", 10) || 1
+//     );
+
+//     const limit = Math.min(
+//       100,
+//       Math.max(
+//         1,
+//         parseInt(searchParams.get("limit") || "10", 10) || 10
+//       )
+//     );
+
+//     const search = searchParams.get("search")?.trim();
+
+//     const filter = {};
+
+//     if (search) {
+//       filter.title = { $regex: search, $options: "i" };
+//     }
+
+//     const [products, total] = await Promise.all([
+//       Product.find(filter)
+//         .populate("collection")
+//         .sort({ createdAt: -1 })
+//         .skip((page - 1) * limit)
+//         .limit(limit)
+//         .lean(),
+
+//       Product.countDocuments(filter),
+//     ]);
+
+//     return NextResponse.json({
+//       success: true,
+//       products,
+//       pagination: {
+//         total,
+//         page,
+//         limit,
+//         totalPages: Math.ceil(total / limit),
+//       },
+//     });
+//   } catch (error) {
+//     console.error("Product GET error:", error);
+
+//     return NextResponse.json(
+//       { success: false, message: "Failed to fetch products" },
+//       { status: 500 }
+//     );
+//   }
+// }
+
+
+export async function GET(req) {
   try {
-    await connectDB();
+    await connectDB()
 
-    const { searchParams } = new URL(request.url);
+    const { searchParams } = new URL(req.url)
 
-    const page = Math.max(
-      1,
-      parseInt(searchParams.get("page") || "1", 10) || 1
-    );
+    const page = Number(searchParams.get("page")) || 1
+    const limit = Number(searchParams.get("limit")) || 50
 
-    const limit = Math.min(
-      100,
-      Math.max(
-        1,
-        parseInt(searchParams.get("limit") || "10", 10) || 10
-      )
-    );
+    const data = await Product.find()
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
 
-    const search = searchParams.get("search")?.trim();
+    const total = await Product.countDocuments()
 
-    const filter = {};
-
-    if (search) {
-      filter.title = { $regex: search, $options: "i" };
-    }
-
-    const [products, total] = await Promise.all([
-      Product.find(filter)
-        .populate("collection")
-        .sort({ createdAt: -1 })
-        .skip((page - 1) * limit)
-        .limit(limit)
-        .lean(),
-
-      Product.countDocuments(filter),
-    ]);
-
-    return NextResponse.json({
-      success: true,
-      products,
-      pagination: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
-    });
+    return NextResponse.json({ success: true, data, total })
   } catch (error) {
-    console.error("Product GET error:", error);
+    console.log("Error in Get Api from categories", error)
 
     return NextResponse.json(
-      { success: false, message: "Failed to fetch products" },
+      { success: false, error: "Error in api" },
       { status: 500 }
-    );
+    )
   }
 }

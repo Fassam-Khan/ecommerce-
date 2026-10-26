@@ -65,11 +65,32 @@ const ProductSchema = new mongoose.Schema(
       trim: true,
     },
 
+     slug: {
+      type: String,
+      required: true,
+      unique: true,        // creates a unique index
+      lowercase: true,
+      trim: true,
+      match: [/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Invalid slug format"],
+    },
+    metaTitle: {
+      type: String,
+      trim: true,
+      maxlength: 70,       // a little above the 60 guideline
+      default: "",
+    },
+    metaDescription: {
+      type: String,
+      trim: true,
+      maxlength: 200,      // a little above the 160 guideline
+      default: "",
+    },
     // Tiptap HTML description
     description: {
       type: String,
       default: "",
     },
+
 
     // Main media selected from your media library
     img_url: [
@@ -80,7 +101,6 @@ const ProductSchema = new mongoose.Schema(
         },
         file: {
           type: String,
-          required: true,
         },
       },
     ],
@@ -110,14 +130,10 @@ const ProductSchema = new mongoose.Schema(
 
     sku: {
       type: String,
-      default: "",
-      trim: true,
     },
 
     barcode: {
       type: String,
-      default: "",
-      trim: true,
     },
 
     status: {
@@ -129,7 +145,7 @@ const ProductSchema = new mongoose.Schema(
     collection: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Collection",
+        ref: "Category",
       },
     ],
 
