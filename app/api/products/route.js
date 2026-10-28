@@ -138,52 +138,49 @@ export async function POST(request) {
 // GET: Fetch Products
 // Supports pagination, search, status
 // =========================
-export async function GET(request) {
+const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const slugify = (str = "") =>
+  str
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+// GET /api/products?page=1&limit=50&search=varnish&status=active
+export async function GET(req) {
   try {
     await connectDB();
 
-    const { searchParams } = new URL(request.url);
+    const { searchParams } = new URL(req.url);
 
-    const page = Math.max(
-      1,
-      parseInt(searchParams.get("page") || "1", 10) || 1
-    );
-
-    const limit = Math.min(
-      100,
-      Math.max(
-        1,
-        parseInt(searchParams.get("limit") || "50", 10) || 50
-      )
-    );
-
-    const search = searchParams.get("search") || "";
+    const page = Math.max(parseInt(searchParams.get("page")) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(searchParams.get("limit")) || 50, 1), 100);
+    const search = searchParams.get("search")?.trim() || "";
     const status = searchParams.get("status") || "all";
 
-    const filter = {};
+    const query = {};
 
-    if (search.trim()) {
-      const safe = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-      filter.title = {
-        $regex: safe,
-        $options: "i",
-      };
+    // Status filter ("all" = no filter)
+    if (["active", "draft", "archived"].includes(status)) {
+      query.status = status;
     }
 
-    if (status !== "all") {
-      filter.status = status;
+    // Search by title or slug (case-insensitive, regex-safe)
+    if (search) {
+      const regex = new RegExp(escapeRegex(search), "i");
+      query.$or = [{ title: regex }, { slug: regex }];
     }
 
     const [data, total] = await Promise.all([
-      Product.find(filter)
-        .populate("collection")
-        .sort({ createdAt: -1 })
+      Product.find(query)
+        .sort({ createdAt: -1, _id: -1 }) // stable order across pages
         .skip((page - 1) * limit)
         .limit(limit)
         .lean(),
-
-      Product.countDocuments(filter),
+      Product.countDocuments(query),
     ]);
 
     return NextResponse.json({
@@ -195,14 +192,7 @@ export async function GET(request) {
       totalPages: Math.ceil(total / limit),
     });
   } catch (error) {
-    console.error("Product GET error:", error);
-
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Failed to fetch products",
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
 }
+

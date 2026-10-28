@@ -1,56 +1,65 @@
-"use client"
-import React, { useState, useEffect } from 'react'
-import { Search } from 'lucide-react'
-import { useRouter, useSearchParams, usePathname } from 'next/navigation'
+"use client";
+import React, { useState, useEffect } from "react";
+import { Search } from "lucide-react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 
 const SearchInput = () => {
-    const router = useRouter()
-    const pathname = usePathname()
-    const searchParams = useSearchParams()
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
-    const [search, setSearch] = useState(searchParams.get('search') || '')
-    const [status, setStatus] = useState(searchParams.get('status') || 'all')
+  const [search, setSearch] = useState(searchParams.get("search") || "");
+  const [status, setStatus] = useState(searchParams.get("status") || "all");
 
-    // debounce: typing rukne ke 400ms baad URL update hoga
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            const params = new URLSearchParams()
-            if (search) params.set('search', search)
-            if (status !== 'all') params.set('status', status)
+  // Debounce: update URL 400ms after the user stops typing
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const params = new URLSearchParams(searchParams.toString());
 
-            const query = params.toString()
-            router.replace(query ? `${pathname}?${query}` : pathname)
-        }, 400)
+      if (search.trim()) params.set("search", search.trim());
+      else params.delete("search");
 
-        return () => clearTimeout(timer)
-    }, [search, status])
+      if (status !== "all") params.set("status", status);
+      else params.delete("status");
 
-    return (
-        <div className='w-full relative py-0.5 outline outline-gray-300 rounded-2xl px-3 py-1 text-[12px]'>
-            <div className='absolute left-2 bg-gray-300 px-2 rounded-2xl'>
-                <select
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value)}
-                    className='cursor-pointer text-[12px] outline-none focus:bg-gray-300'
-                >
-                    <option value="all">All</option>
-                    <option value="active">Active</option>
-                    <option value="draft">Draft</option>
-                    <option value="archived">Archived</option>
-                </select>
-            </div>
+      const next = params.toString();
+      const current = searchParams.toString();
 
-            <Search className='absolute left-24 w-4 h-4 top-1/5' />
+      // Skip if nothing changed (avoids a useless navigation on mount)
+      if (next === current) return;
 
-            <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className='w-full text-[12px] outline-none ml-27'
-                placeholder='Search and filter'
-            />
-        </div>
-    )
-}
+      router.replace(next ? `${pathname}?${next}` : pathname);
+    }, 400);
 
-export default SearchInput
+    return () => clearTimeout(timer);
+  }, [search, status]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div className="relative flex w-full items-center rounded-2xl px-3 py-1 text-[12px] outline outline-gray-300">
+      <div className="rounded-2xl bg-gray-300 px-2">
+        <select
+          value={status}
+          onChange={(e) => setStatus(e.target.value)}
+          className="cursor-pointer bg-transparent text-[12px] outline-none"
+        >
+          <option value="all">All</option>
+          <option value="active">Active</option>
+          <option value="draft">Draft</option>
+          <option value="archived">Archived</option>
+        </select>
+      </div>
+
+      <Search className="ml-3 h-4 w-4 shrink-0 text-gray-500" />
+
+      <input
+        type="text"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="ml-2 w-full bg-transparent text-[12px] outline-none"
+        placeholder="Search and filter"
+      />
+    </div>
+  );
+};
+
+export default SearchInput;

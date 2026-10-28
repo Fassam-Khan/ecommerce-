@@ -25,7 +25,8 @@ const page = () => {
             {/* Table */}
             <div className='mt-6'>
                 <Suspense>
-                    <TableMy />
+                <TableMy />
+
                 </Suspense>
             </div>
         </div>

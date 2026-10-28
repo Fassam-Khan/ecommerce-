@@ -108,10 +108,10 @@ const Page = () => {
                     metaDescription: product.metaDescription ?? '',
                     status: product.status ?? 'draft',
                     collection: Array.isArray(product.collection)
-  ? product.collection.map((item) =>
-      String(item?._id ?? item)
-    )
-  : [],
+                        ? product.collection.map((item) =>
+                            String(item?._id ?? item)
+                        )
+                        : [],
                     varient: Array.isArray(product.varient) && product.varient.length > 0
                         ? product.varient.map((variant) => ({
                             ...variant,
@@ -159,7 +159,7 @@ const Page = () => {
     }, [])
 
 
-    
+
 
     // shortcuts for variant data
     const optionName = Form.varient?.[0]?.varientName ?? ''
@@ -301,12 +301,12 @@ const Page = () => {
     // ---------- collections (multi select, slug is saved) ----------
     const toggleCollection = (categoryId) => {
         setForm((prev) => ({
-          ...prev,
-          collection: prev.collection.includes(categoryId)
-            ? prev.collection.filter((id) => id !== categoryId)
-            : [...prev.collection, categoryId],
+            ...prev,
+            collection: prev.collection.includes(categoryId)
+                ? prev.collection.filter((id) => id !== categoryId)
+                : [...prev.collection, categoryId],
         }));
-      };
+    };
 
     // ---------- submit ----------
     const submitData = async () => {
@@ -398,7 +398,13 @@ const Page = () => {
 
     return (
         <div>
-            {/* top Head  */}
+            {loading &&(
+                <div className="h-full w-full bg-white z-50">
+                    <p>Loading...</p>
+                </div>
+            )}
+
+
             <div className='flex gap-3'>
                 <Link href={'/admin/products'} aria-label="Back to products">
                     <div className='relative group w-5 hover:bg-gray-300 transition-all h-5 flex justify-center items-center p-0.5 cursor-pointer rounded-full border border-gray-300'>
@@ -413,7 +419,6 @@ const Page = () => {
                     Products
                 </div>
             </div>
-
             {/* Middle content  */}
             <div className='max-w-[1000px] mt-10 m-auto flex'>
                 {/* left Div  */}
@@ -795,30 +800,30 @@ const Page = () => {
                         <Box>
                             <h2 className="text-sm font-semibold mb-2">Collections</h2>
                             <div className="flex flex-col gap-1 max-h-[260px] overflow-y-auto">
-                            {Collections.map((c) => (
-  <label
-    key={c._id}
-    className="flex items-start gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 cursor-pointer"
-  >
-    <input
-      type="checkbox"
-      className="mt-0.5"
-      checked={Form.collection.some(
-        (id) => String(id) === String(c._id)
-      )}
-      onChange={() => toggleCollection(String(c._id))}
-    />
+                                {Collections.map((c) => (
+                                    <label
+                                        key={c._id}
+                                        className="flex items-start gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 cursor-pointer"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            className="mt-0.5"
+                                            checked={Form.collection.some(
+                                                (id) => String(id) === String(c._id)
+                                            )}
+                                            onChange={() => toggleCollection(String(c._id))}
+                                        />
 
-    <span>
-      <span className="block text-[12px] font-semibold">
-        {c.title}
-      </span>
-      <span className="block text-[10px] text-gray-500">
-        {c.description}
-      </span>
-    </span>
-  </label>
-))}
+                                        <span>
+                                            <span className="block text-[12px] font-semibold">
+                                                {c.title}
+                                            </span>
+                                            <span className="block text-[10px] text-gray-500">
+                                                {c.description}
+                                            </span>
+                                        </span>
+                                    </label>
+                                ))}
                                 {Collections.length === 0 && (
                                     <p className="text-[11px] text-gray-500 px-2">No collections yet</p>
                                 )}
@@ -832,6 +837,10 @@ const Page = () => {
                     </Paper>
                 </div>
             </div>
+
+
+
+
             <ToastContainer />
         </div>
     )
