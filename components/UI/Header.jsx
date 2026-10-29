@@ -2,6 +2,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import React from 'react'
 import SearchDrawer from './SearchDrawer'
+import UserAccount from './UserAccount'
 
 const Header = () => {
 
@@ -66,9 +67,13 @@ const Menue = [
                 </div>
 
                 {/* Icons DIv  */}
-                <div>
+                <div className='flex gap-6   '>
                     <div>
                         <SearchDrawer/>
+                    </div>
+
+                    <div>
+                        <UserAccount/>
                     </div>
 
                 </div>

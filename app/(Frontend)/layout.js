@@ -1,6 +1,7 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "@/app/globals.css";
 import Header from "@/components/UI/Header";
+import { Provider } from "react-redux";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -24,10 +25,13 @@ export default function FrontLayout({ children }) {
       className={` h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <Provider>
         <Header/>
         hello world
         
-        {children}</body>
+        {children}
+        </Provider>
+        </body>
     </html>
   );
 }
