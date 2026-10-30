@@ -50,7 +50,7 @@ const Header = () => {
 
                 {/* Menu bar  */}
 
-                <div>
+                <div className='md:hidden'>
                     <MobileMenue/>
 
                 </div>

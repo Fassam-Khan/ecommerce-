@@ -20,7 +20,7 @@ export default function MobileMenue() {
   return (
     <>
       <button onClick={() => setOpen(true)}>
-        <Menu className="hover:text-[var(--brand-red)] cursor-pointer" />
+        <Menu className="hover:text-[var(--brand-red)]  cursor-pointer" />
       </button>
 
       <Drawer

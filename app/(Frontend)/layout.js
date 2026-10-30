@@ -27,7 +27,7 @@ export default function FrontLayout({ children }) {
       <body className="min-h-full flex flex-col">
       
         <Header/>
-        hello world
+       
         
         {children}
        
