@@ -17,6 +17,7 @@ export async function POST(req) {
 
     const products = await Product.find({
       title: { $regex: safe, $options: "i" },
+      status : {$regex : "active"}
     })
       .select("title price img_url slug")
       .limit(10)

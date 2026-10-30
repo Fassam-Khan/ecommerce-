@@ -25,12 +25,12 @@ export default function FrontLayout({ children }) {
       className={` h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <Provider>
+      
         <Header/>
         hello world
         
         {children}
-        </Provider>
+       
         </body>
     </html>
   );

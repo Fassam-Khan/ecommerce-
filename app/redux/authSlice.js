@@ -1,3 +1,4 @@
+"use client"
 import { createSlice } from "@reduxjs/toolkit";
 
 const authSlice = createSlice({
@@ -26,3 +27,7 @@ const authSlice = createSlice({
 
 export const { setUser, logoutUser } = authSlice.actions;
 export default authSlice.reducer;
+
+
+
+
