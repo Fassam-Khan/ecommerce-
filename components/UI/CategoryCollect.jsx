@@ -12,43 +12,43 @@ const collections = [
   {
     id: 1,
     title: "Art Supplies",
-    image: "https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=500",
+    image: "/acrylicpaint.avif",
     slug: "art-supplies",
   },
   {
     id: 2,
-    title: "Acrylic Paints",
-    image: "https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=500",
-    slug: "acrylic-paints",
+    title: "Brushes",
+    image: "/brush.avif",
+    slug: "brushes",
   },
   {
     id: 3,
-    title: "Paint Brushes",
-    image: "https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=500",
+    title: "Sketch Books",
+    image: "/sketchbooks.avif",
     slug: "paint-brushes",
   },
   {
     id: 4,
-    title: "Sketchbooks",
-    image: "https://images.unsplash.com/photo-1455390582262-044cdead277a?w=500",
+    title: "Canvases",
+    image: "/canvas.avif",
     slug: "sketchbooks",
   },
   {
     id: 5,
-    title: "Canvases",
-    image: "https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=500",
+    title: "Mediums",
+    image: "/mediums.avif",
     slug: "canvases",
   },
   {
     id: 6,
     title: "School Supplies",
-    image: "https://images.unsplash.com/photo-1453738773917-9c3eff1db985?w=500",
+    image: "/school.avif",
     slug: "school-supplies",
   },
   {
     id: 7,
     title: "Office Supplies",
-    image: "https://images.unsplash.com/photo-1497366754035-f200968a6e72?w=500",
+    image: "/office.avif",
     slug: "office-supplies",
   },
 ];
@@ -89,7 +89,7 @@ export default function ExploreCollections() {
       </div>
 
       {/* Swiper */}
-      <Swiper 
+      <Swiper  className="mt-8"
         onSwiper={(swiper) => {
           swiperRef.current = swiper;
         }}
@@ -108,7 +108,7 @@ export default function ExploreCollections() {
               href={`/collections/${item.slug}`}
               className="group block"
             >
-              <div className="aspect-square overflow-hidden rounded-xl bg-gray-100">
+              <div className="overflow-hidden rounded-full ">
                 <img
                   src={item.image}
                   alt={item.title}
