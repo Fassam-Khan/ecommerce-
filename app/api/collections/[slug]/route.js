@@ -1,6 +1,6 @@
 // app/api/collections/[slug]/route.js
 import { NextResponse } from "next/server";
-import { getCollectionProducts } from "@/lib/products";
+import { getCollectionProducts } from "@/lib/product";
 
 export async function GET(req, { params }) {
   try {
