@@ -25,7 +25,7 @@ export default function AddToCartButton({ product, quantity = 1, className = "" 
         _id: product._id,
         title: product.title,
         price: product.price,
-        image: getImage(product),
+        image: product?.img_url[0],
         slug: product.slug,
         stock: product.stock,
         quantity,
