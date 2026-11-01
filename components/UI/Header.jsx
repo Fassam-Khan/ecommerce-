@@ -62,8 +62,9 @@ const Header = () => {
 
                 {/* logo  */}
                 <div>
+                    <Link href={'/'}>
                     <Image src={'/logo.webp'} width={180} height={100} alt='nazar-brothers-logo' />
-
+                    </Link>
                 </div>
 
                 {/* Nav Links  */}
