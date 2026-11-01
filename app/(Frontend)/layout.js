@@ -2,6 +2,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "@/app/globals.css";
 import Header from "@/components/UI/Header";
 import { Provider } from "react-redux";
+import ReduxProvider from "../redux/Provider";
 import CartDrawer from "@/components/UI/Cartdrawer";
 
 const geistSans = Geist({
@@ -24,15 +25,16 @@ export default function FrontLayout({ children }) {
     <html
       lang="en"
       className={` h-full antialiased`}
-    >
+    > 
       <body className="min-h-full flex flex-col">
       
-        <Header/>
-       
         
-        {children}
-
-        <CartDrawer/>
+       
+        <ReduxProvider>
+        <Header/>
+          {children}
+          <CartDrawer/>
+        </ReduxProvider>
 
         
        

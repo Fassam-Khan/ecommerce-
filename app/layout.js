@@ -3,6 +3,7 @@ import "@/app/globals.css";
 import Providers from "./provider";
 import ReduxProvider from "./redux/Provider";
 import CartDrawer from "@/components/UI/Cartdrawer";
+import CartPersist from "@/components/CartPersist";
 
 
 
@@ -31,7 +32,8 @@ export default function RootLayout({ children }) {
       <body className="min-h-full flex flex-col">
       
         
-      <ReduxProvider>
+      <ReduxProvider >
+      <CartPersist />
           {children}
           <CartDrawer/>
         </ReduxProvider>

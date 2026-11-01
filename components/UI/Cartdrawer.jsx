@@ -21,18 +21,7 @@ export default function CartDrawer() {
   const items = useSelector(selectCartItems);
   const total = useSelector(selectCartTotal);
 
-  const [FinalData, setFinalData] = useState([])
-  console.log(FinalData)
 
-  useEffect(() => {
-    if(FinalData.length > 0 ){
-      localStorage.setItem("Cart", items)
-    }else{
-      const Data = JSON.parse(localStorage.getItem("Cart"))
-      setFinalData(Data)
-    }
-  
-  }, [items])
 
 
 
@@ -42,10 +31,7 @@ export default function CartDrawer() {
   // Escape se band + background scroll lock
   useEffect(() => {
 
-    localStorage.setItem("Cart", JSON.stringify(items))
-
-    const Data = JSON.parse(localStorage.getItem("Cart"))
-    setFinalData(Data)
+   
     if (!open) return;
     const onKey = (e) => e.key === "Escape" && dispatch(closeCart());
     document.addEventListener("keydown", onKey);
@@ -80,12 +66,12 @@ export default function CartDrawer() {
         ) : (
           <>
             <ul className="flex-1 divide-y overflow-y-auto px-4">
-              {FinalData.map((item) => (
+              {items.map((item) => (
                 <li key={item._id} className="flex gap-3 py-4">
                   <div className="h-20 w-20 shrink-0 overflow-hidden rounded bg-gray-100">
                     {item.image && (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={item.image} alt={item.title} className="h-full w-full object-cover" />
+                      <img src={item.image.file} alt={item.title} className="h-full w-full object-cover" />
                     )}
                   </div>
 

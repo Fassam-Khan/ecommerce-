@@ -11,6 +11,8 @@ const clamp = (qty, stock) => {
   return typeof stock === "number" && stock > 0 ? Math.min(q, stock) : q;
 };
 
+export const selectCartHydrated = (s) => s.cart.hydrated;
+
 const cartSlice = createSlice({
   name: "cart",
   initialState,
