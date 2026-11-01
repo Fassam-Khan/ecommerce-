@@ -51,7 +51,7 @@ const Header = () => {
                 {/* Menu bar  */}
 
                 <div className='md:hidden'>
-                    <MobileMenue/>
+                    <MobileMenue />
 
                 </div>
 
@@ -93,12 +93,14 @@ const Header = () => {
                     </div>
 
                     <div className="hidden md:flex">
-                        <WishList  />
+                        <WishList />
+                    </div>
+                    <div>
+                    <Cart />
+
                     </div>
 
-                    <div>
-                        <Cart />
-                    </div>
+
 
                 </div>
             </div>

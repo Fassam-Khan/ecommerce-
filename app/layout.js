@@ -2,6 +2,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "@/app/globals.css";
 import Providers from "./provider";
 import ReduxProvider from "./redux/Provider";
+import CartDrawer from "@/components/UI/Cartdrawer";
 
 
 
@@ -32,6 +33,7 @@ export default function RootLayout({ children }) {
         
       <ReduxProvider>
           {children}
+          <CartDrawer/>
         </ReduxProvider>
         </body>
     </html>

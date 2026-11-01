@@ -30,6 +30,8 @@ export default function FrontLayout({ children }) {
        
         
         {children}
+
+        
        
         </body>
     </html>
