@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { getCollectionProducts } from "@/lib/products";
 
+
 export async function GET(req, { params }) {
   try {
     const { slug } = await params; // Next.js 15 mein params Promise hai
