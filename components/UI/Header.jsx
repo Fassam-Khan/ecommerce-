@@ -84,7 +84,7 @@ const Header = () => {
                 </div>
 
                 {/* Icons DIv  */}
-                <div className='flex gap-6   '>
+                <div className='flex gap-6 items-center  '>
                     <div className=''>
                         <SearchDrawer />
                     </div>

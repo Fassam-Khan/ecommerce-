@@ -12,7 +12,7 @@ const ProductCard = ({ product }) => {
     <div className="w-full h-[370px] rounded-2xl border border-gray-300 overflow-hidden flex flex-col">
       <Link href={`/products/${product.slug}`}>
       {/* Image */}
-      <div className="relative w-full h-[200px] bg-gray-100">
+      <div className="relative w-full h-[230px] bg-gray-100">
         {imageUrl && (
           <Image
             src={imageUrl}
