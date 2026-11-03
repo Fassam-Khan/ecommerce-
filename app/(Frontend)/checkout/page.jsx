@@ -3,10 +3,9 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useDispatch, useSelector } from "react-redux";
+import { useSelector } from "react-redux";
 import InfoInput from "@/components/InfoInput";
-import { clearCart, selectCartItems, selectCartTotal } from "@/app/redux/cartSlice";
-import axios from "axios";
+import { selectCartItems, selectCartTotal } from "@/app/redux/cartSlice";
 
 /* ---------------- config ---------------- */
 const money = (n) => `Rs ${Number(n).toLocaleString("en-PK")}`;
@@ -16,7 +15,7 @@ const SHIPPING_METHODS = [
 ];
 const PAYMENT_METHODS = [
   { id: "cod", label: "Cash on Delivery (COD)", note: "Pay in cash when your order arrives." },
-  { id: "card", label: "Bank Transfer", note: "Card details are entered after you continue." },
+  { id: "card", label: "Credit / debit card", note: "Card details are entered after you continue." },
 ];
 const DISCOUNTS = { WELCOME10: 0.1 }; // demo only, validate on the server in production
 const COUNTRIES = ["Pakistan", "United Arab Emirates", "United Kingdom", "United States"];
@@ -138,14 +137,10 @@ function Summary({ items, subtotal, discount, shipping, total, code, setCode, co
 
 /* ---------------- page ---------------- */
 export default function CheckoutPage() {
-
   const router = useRouter();
-  const dispatch = useDispatch();
   const items = useSelector(selectCartItems);
   const subtotal = useSelector(selectCartTotal);
   const hydrated = useSelector((s) => s.cart.hydrated);
-
- 
 
   const [form, setForm] = useState({
     email: "",
@@ -221,7 +216,6 @@ export default function CheckoutPage() {
 
     setSubmitting(true);
     try {
-
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -245,15 +239,12 @@ export default function CheckoutPage() {
           discountCode: appliedCode || null,
           items: items.map((i) => ({ _id: i._id, quantity: i.quantity })), // server recalculates prices
         }),
-
-        // End 
       });
       const data = await res.json().catch(() => ({}));
-
-     
       if (!res.ok) throw new Error(data.message || "We couldn't place your order. Try again.");
-      dispatch(clearCart());
-      router.push(`/checkout/success?order=${data.orderId ?? ""}`);
+      // The cart is cleared on the success page, so this page doesn't flash "cart is empty"
+      console.log(data)
+    router.push(`/checkout/success?order=${data.orderId}&t=${data.token}`)
     } catch (err) {
       setServerError(err.message);
       setSubmitting(false);

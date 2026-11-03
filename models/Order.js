@@ -14,7 +14,8 @@ const OrderItemSchema = new mongoose.Schema(
 
 const OrderSchema = new mongoose.Schema(
   {
-    orderNumber: { type: String, unique: true, index: true },
+    orderNumber: { type: Number, unique: true, index: true }, // 1001, 1002, ...
+    accessToken: { type: String, required: true }, // lets only the buyer open the success page
     customer: {
       email: { type: String, required: true, lowercase: true, trim: true },
       firstName: String,

@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useDispatch } from "react-redux";
-import { clearCart } from "@/store/cartSlice";
+import { clearCart } from "@/app/redux/cartSlice";
 
 export default function ClearCart() {
   const dispatch = useDispatch();

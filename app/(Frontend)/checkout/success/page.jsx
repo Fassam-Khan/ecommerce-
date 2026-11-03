@@ -1,15 +1,16 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import connectDB from "@/lib/mongodb";
 import Order from "@/models/Order";
 import ClearCart from "./ClearCart";
-import connectDB from "@/lib/mongodb";
 
 export const metadata = { title: "Order confirmed" };
 export const dynamic = "force-dynamic";
 
 const money = (n) => `Rs ${Number(n).toLocaleString("en-PK")}`;
 
-export default async function SuccessPage({ searchParams }) {
+export default async function Page({ searchParams }) {
+    console.log(searchParams)
   const { order: orderNumber, t: token } = await searchParams;
 
   // The token stops people from opening other customers' orders by guessing 1001, 1002...

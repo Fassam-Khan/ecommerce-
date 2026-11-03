@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import mongoose from "mongoose";
 import connectDB from "@/lib/mongodb";
+import crypto from "crypto";
 import Order from "@/models/Order";
+import Counter from "@/models/Counter";
 import Product from "@/models/Product"; // needs: title, slug, image, price, stock
 import { DISCOUNTS, PAYMENT_METHODS, SHIPPING_METHODS } from "@/lib/Checkoutconfig";
-import Counter from "@/models/Counter";
+
 
 /* ---------- helpers ---------- */
 class OrderError extends Error {
@@ -14,10 +16,12 @@ class OrderError extends Error {
   }
 }
 
+const str = (v) => (typeof v === "string" ? v.trim() : "");
 
+// Atomic counter: 1001, 1002, 1003, ... (safe even with many simultaneous orders)
 async function makeOrderNumber() {
   const counter = await Counter.findOneAndUpdate(
-    { _id: "orderNumber" },
+    { _id: "order" },
     { $inc: { sequence: 1 } },
     {
       new: true,
@@ -28,10 +32,6 @@ async function makeOrderNumber() {
 
   return counter.sequence;
 }
-
-const str = (v) => (typeof v === "string" ? v.trim() : "");
-
-
 
 function validateBody(body) {
   const customer = {
@@ -89,6 +89,7 @@ function validateBody(body) {
 /* ---------- POST /api/orders ---------- */
 export async function POST(req) {
   const reserved = []; // stock we've already taken, for rollback
+  
 
   try {
     let body;
@@ -152,11 +153,14 @@ export async function POST(req) {
       reserved.push(l);
     }
 
-    const orderNumber = await makeOrderNumber();
+    const orderNum = await makeOrderNumber()
+    const accessToken = crypto.randomBytes(16).toString("hex");   // <-- naya
+
 
     // 5) Save the order
     const order = await Order.create({
-      orderNumber,
+      orderNumber:  orderNum,
+      accessToken, 
       customer: v.customer,
       shippingAddress: v.shippingAddress,
       items: lines.map(({ stock, ...rest }) => rest), // drop stock from the snapshot
@@ -171,7 +175,10 @@ export async function POST(req) {
       total,
     });
 
-    return NextResponse.json({ orderId: order.orderNumber, total }, { status: 201 });
+    return NextResponse.json(
+      { orderId: order.orderNumber,  token: accessToken, total },
+      { status: 201 }
+    );
   } catch (err) {
     // put reserved stock back if anything failed after reserving
     await Promise.all(
