@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
 import InfoInput from "@/components/InfoInput";
 import { clearCart, selectCartItems, selectCartTotal } from "@/app/redux/cartSlice";
+import axios from "axios";
 
 /* ---------------- config ---------------- */
 const money = (n) => `Rs ${Number(n).toLocaleString("en-PK")}`;
@@ -137,11 +138,14 @@ function Summary({ items, subtotal, discount, shipping, total, code, setCode, co
 
 /* ---------------- page ---------------- */
 export default function CheckoutPage() {
+
   const router = useRouter();
   const dispatch = useDispatch();
   const items = useSelector(selectCartItems);
   const subtotal = useSelector(selectCartTotal);
   const hydrated = useSelector((s) => s.cart.hydrated);
+
+ 
 
   const [form, setForm] = useState({
     email: "",
@@ -217,6 +221,7 @@ export default function CheckoutPage() {
 
     setSubmitting(true);
     try {
+
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -240,8 +245,12 @@ export default function CheckoutPage() {
           discountCode: appliedCode || null,
           items: items.map((i) => ({ _id: i._id, quantity: i.quantity })), // server recalculates prices
         }),
+
+        // End 
       });
       const data = await res.json().catch(() => ({}));
+
+     
       if (!res.ok) throw new Error(data.message || "We couldn't place your order. Try again.");
       dispatch(clearCart());
       router.push(`/checkout/success?order=${data.orderId ?? ""}`);

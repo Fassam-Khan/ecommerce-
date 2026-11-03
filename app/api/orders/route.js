@@ -4,6 +4,7 @@ import connectDB from "@/lib/mongodb";
 import Order from "@/models/Order";
 import Product from "@/models/Product"; // needs: title, slug, image, price, stock
 import { DISCOUNTS, PAYMENT_METHODS, SHIPPING_METHODS } from "@/lib/Checkoutconfig";
+import Counter from "@/models/Counter";
 
 /* ---------- helpers ---------- */
 class OrderError extends Error {
@@ -13,10 +14,24 @@ class OrderError extends Error {
   }
 }
 
+
+async function makeOrderNumber() {
+  const counter = await Counter.findOneAndUpdate(
+    { _id: "orderNumber" },
+    { $inc: { sequence: 1 } },
+    {
+      new: true,
+      upsert: true,
+      setDefaultsOnInsert: true,
+    }
+  );
+
+  return counter.sequence;
+}
+
 const str = (v) => (typeof v === "string" ? v.trim() : "");
 
-const makeOrderNumber = () =>
-  "ORD-" + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2, 5).toUpperCase();
+
 
 function validateBody(body) {
   const customer = {
@@ -137,9 +152,11 @@ export async function POST(req) {
       reserved.push(l);
     }
 
+    const orderNumber = await makeOrderNumber();
+
     // 5) Save the order
     const order = await Order.create({
-      orderNumber: makeOrderNumber(),
+      orderNumber,
       customer: v.customer,
       shippingAddress: v.shippingAddress,
       items: lines.map(({ stock, ...rest }) => rest), // drop stock from the snapshot
