@@ -157,10 +157,10 @@ export async function POST(req) {
     const accessToken = crypto.randomBytes(16).toString("hex");   // <-- naya
 
 
-    // 5) Save the order
+    // 5 Save the order
     const order = await Order.create({
       orderNumber:  orderNum,
-      accessToken, 
+      tokenNumber: accessToken,
       customer: v.customer,
       shippingAddress: v.shippingAddress,
       items: lines.map(({ stock, ...rest }) => rest), // drop stock from the snapshot
@@ -176,7 +176,7 @@ export async function POST(req) {
     });
 
     return NextResponse.json(
-      { orderId: order.orderNumber,  token: accessToken, total },
+      { orderId: order.orderNumber,  token: order.tokenNumber, total },
       { status: 201 }
     );
   } catch (err) {

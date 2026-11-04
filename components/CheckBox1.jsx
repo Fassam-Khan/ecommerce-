@@ -5,7 +5,7 @@ const label = { slotProps: { input: { 'aria-label': 'Checkbox demo' } } };
 export default function CheckBox1() {
   return (
     <div>
-      <Checkbox {...label} defaultChecked />
+      <Checkbox {...label} defaultChecked size='small' />
     
     </div>
   );
