@@ -1,9 +1,9 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose'
 
-// One document per counter, e.g. { _id: "order", seq: 3 }
+// One document per named sequence, e.g. { _id: "order", seq: 5 }
 const CounterSchema = new mongoose.Schema({
   _id: { type: String, required: true },
   seq: { type: Number, default: 0 },
-});
+})
 
-export default mongoose.models.Counter || mongoose.model("Counter", CounterSchema);
+export default mongoose.models.Counter || mongoose.model('Counter', CounterSchema)

@@ -1,194 +1,216 @@
-import { NextResponse } from "next/server";
-import mongoose from "mongoose";
-import connectDB from "@/lib/mongodb";
-import crypto from "crypto";
-import Order from "@/models/Order";
-import Counter from "@/models/Counter";
-import Product from "@/models/Product"; // needs: title, slug, image, price, stock
-import { DISCOUNTS, PAYMENT_METHODS, SHIPPING_METHODS } from "@/lib/Checkoutconfig";
+import { NextResponse } from 'next/server'
+import mongoose from 'mongoose'
+import connectDB from '@/lib/mongodb'
+import Product from '@/models/Product'
+import Order from '@/models/Order'
+import Counter from '@/models/Counter'
 
+const SHIPPING = 350
+const FIRST_ORDER_NUMBER = 1001
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-/* ---------- helpers ---------- */
 class OrderError extends Error {
   constructor(message, status = 400) {
-    super(message);
-    this.status = status;
+    super(message)
+    this.status = status
   }
 }
 
-const str = (v) => (typeof v === "string" ? v.trim() : "");
-
-// Atomic counter: 1001, 1002, 1003, ... (safe even with many simultaneous orders)
-async function makeOrderNumber() {
+// Atomically gets the next order number: 1001, 1002, 1003, ...
+async function getNextOrderNumber() {
   const counter = await Counter.findOneAndUpdate(
-    { _id: "order" },
-    { $inc: { sequence: 1 } },
-    {
-      new: true,
-      upsert: true,
-      setDefaultsOnInsert: true,
-    }
-  );
-
-  return counter.sequence;
+    { _id: 'order' },
+    { $inc: { seq: 1 } },
+    { new: true, upsert: true }
+  )
+  return FIRST_ORDER_NUMBER - 1 + counter.seq
 }
 
-function validateBody(body) {
-  const customer = {
-    email: str(body?.customer?.email).toLowerCase(),
-    firstName: str(body?.customer?.firstName),
-    lastName: str(body?.customer?.lastName),
-    phone: str(body?.customer?.phone),
-    newsletter: !!body?.customer?.newsletter,
-  };
-  const shippingAddress = {
-    country: str(body?.shippingAddress?.country),
-    address: str(body?.shippingAddress?.address),
-    apartment: str(body?.shippingAddress?.apartment),
-    city: str(body?.shippingAddress?.city),
-    postalCode: str(body?.shippingAddress?.postalCode),
-  };
-
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(customer.email)) throw new OrderError("Enter a valid email");
-  if (!customer.firstName) throw new OrderError("Enter a first name");
-  if (!customer.lastName) throw new OrderError("Enter a last name");
-  if (shippingAddress.address.length < 5) throw new OrderError("Enter a complete address");
-  if (!shippingAddress.city) throw new OrderError("Enter a city");
-  if (!/^\+?\d{10,14}$/.test(customer.phone.replace(/[\s()-]/g, ""))) throw new OrderError("Enter a valid phone number");
-
-  const shippingMethod = SHIPPING_METHODS[body?.shippingMethod];
-  if (!shippingMethod) throw new OrderError("Select a shipping method");
-
-  const paymentMethod = body?.paymentMethod;
-  if (!PAYMENT_METHODS.includes(paymentMethod)) throw new OrderError("Select a payment method");
-
-  const rawItems = Array.isArray(body?.items) ? body.items : [];
-  if (rawItems.length === 0) throw new OrderError("Your cart is empty");
-  if (rawItems.length > 50) throw new OrderError("Too many items in one order");
-
-  // merge duplicates, sanitise quantities
-  const qtyById = new Map();
-  for (const it of rawItems) {
-    if (!mongoose.isValidObjectId(it?._id)) throw new OrderError("Invalid item in cart");
-    const q = Math.floor(Number(it.quantity));
-    if (!Number.isFinite(q) || q < 1 || q > 99) throw new OrderError("Invalid item quantity");
-    qtyById.set(String(it._id), (qtyById.get(String(it._id)) || 0) + q);
-  }
-
-  return {
-    customer,
-    shippingAddress,
-    shippingMethodId: body.shippingMethod,
-    shippingMethod,
-    paymentMethod,
-    discountCode: str(body?.discountCode).toUpperCase() || null,
-    qtyById,
-  };
+// Puts stock back for lines that were already decremented.
+async function restoreStock(reserved) {
+  await Promise.all(
+    reserved.map((line) =>
+      Product.updateOne({ _id: line.product }, { $inc: { stock: line.quantity } })
+    )
+  )
 }
 
-/* ---------- POST /api/orders ---------- */
 export async function POST(req) {
-  const reserved = []; // stock we've already taken, for rollback
-  
+  const reserved = [] // lines whose stock we've already reduced
 
   try {
-    let body;
-    try {
-      body = await req.json();
-    } catch {
-      throw new OrderError("Invalid request");
+    await connectDB()
+    const body = await req.json()
+
+    // ---- 1. Validate customer fields ----
+    const str = (v) => (typeof v === 'string' ? v.trim() : '')
+    const customer = {
+      email: str(body.email).toLowerCase(),
+      country: str(body.country) || 'pakistan',
+      firstName: str(body.firstName),
+      lastName: str(body.lastName),
+      address: str(body.address),
+      apartment: str(body.apartment),
+      city: str(body.city),
+      postalCode: str(body.postalCode),
+      phone: str(body.phone),
+      payment: str(body.payment),
     }
 
-    const v = validateBody(body);
-    await connectDB();
+    if (!EMAIL_REGEX.test(customer.email)) throw new OrderError('Please enter a valid email')
+    for (const [field, label] of [
+      ['firstName', 'first name'],
+      ['lastName', 'last name'],
+      ['address', 'address'],
+      ['city', 'city'],
+      ['phone', 'phone number'],
+      ['payment', 'payment method'],
+    ]) {
+      if (!customer[field]) throw new OrderError(`Please enter your ${label}`)
+    }
 
-    // 1) Load real products + prices from the database (never trust the browser)
-    const ids = [...v.qtyById.keys()];
-    const products = await Product.find({ _id: { $in: ids } }).lean();
-    if (products.length !== ids.length) {
-      throw new OrderError("Some items in your cart are no longer available. Please review your cart.", 409);
+    // ---- 2. Validate cart lines (merge duplicates) ----
+    if (!Array.isArray(body.items) || body.items.length === 0) {
+      throw new OrderError('Your cart is empty')
+    }
+
+    const wanted = new Map() // productId -> quantity
+    for (const item of body.items) {
+      const id = String(item?._id)
+      const qty = Number(item?.quantity)
+      if (!mongoose.isValidObjectId(id)) throw new OrderError('Invalid product in cart')
+      if (!Number.isInteger(qty) || qty < 1) throw new OrderError('Invalid quantity in cart')
+      wanted.set(id, (wanted.get(id) || 0) + qty)
+    }
+
+    // ---- 3. Load real products so price comes from the DB, not the browser ----
+    const products = await Product.find({ _id: { $in: [...wanted.keys()] } })
+    if (products.length !== wanted.size) {
+      throw new OrderError('Some products in your cart are no longer available', 404)
     }
 
     const lines = products.map((p) => ({
       product: p._id,
       title: p.title,
-      slug: p.slug,
-      image: p.image,
       price: p.price,
-      stock: p.stock,
-      quantity: v.qtyById.get(String(p._id)),
-    }));
+      image: p.image?.file || '',
+      quantity: wanted.get(String(p._id)),
+    }))
 
-    // 2) Check stock
-    for (const l of lines) {
-      if (typeof l.stock === "number" && l.quantity > l.stock) {
+    // ---- 4. Reduce stock atomically, one product at a time ----
+    // The filter `stock: { $gte: quantity }` means two shoppers can never
+    // buy the last item at the same time, and stock can never go negative.
+    for (const line of lines) {
+      const updated = await Product.findOneAndUpdate(
+        { _id: line.product, stock: { $gte: line.quantity } },
+        { $inc: { stock: -line.quantity } },
+        { new: true }
+      )
+      if (!updated) {
         throw new OrderError(
-          l.stock === 0 ? `${l.title} is out of stock.` : `Only ${l.stock} of ${l.title} left in stock.`,
+          `Sorry, "${line.title}" doesn't have ${line.quantity} left in stock. Please lower the quantity.`,
           409
-        );
+        )
       }
+      reserved.push(line)
     }
 
-    // 3) Recalculate totals on the server
-    const subtotal = lines.reduce((n, l) => n + l.price * l.quantity, 0);
-    let discount = 0;
-    if (v.discountCode) {
-      const rate = DISCOUNTS[v.discountCode];
-      if (!rate) throw new OrderError("Enter a valid discount code");
-      discount = Math.round(subtotal * rate);
-    }
-    const shipping = v.shippingMethod.price;
-    const total = subtotal - discount + shipping;
+    // ---- 5. Create the order ----
+    const subtotal = lines.reduce((sum, l) => sum + l.price * l.quantity, 0)
+    const totalItems = lines.reduce((sum, l) => sum + l.quantity, 0)
+    const orderNumber = await getNextOrderNumber()
 
-    // 4) Reserve stock atomically (the stock >= qty filter prevents overselling)
-    for (const l of lines) {
-      if (typeof l.stock !== "number") continue; // stock not tracked for this product
-      const r = await Product.updateOne(
-        { _id: l.product, stock: { $gte: l.quantity } },
-        { $inc: { stock: -l.quantity } }
-      );
-      if (r.modifiedCount === 0) {
-        throw new OrderError(`${l.title} just sold out. Please update your cart.`, 409);
-      }
-      reserved.push(l);
-    }
-
-    const orderNum = await makeOrderNumber()
-    const accessToken = crypto.randomBytes(16).toString("hex");   // <-- naya
-
-
-    // 5 Save the order
     const order = await Order.create({
-      orderNumber:  orderNum,
-      tokenNumber: accessToken,
-      customer: v.customer,
-      shippingAddress: v.shippingAddress,
-      items: lines.map(({ stock, ...rest }) => rest), // drop stock from the snapshot
-      shippingMethod: v.shippingMethodId,
-      paymentMethod: v.paymentMethod,
-      paymentStatus: "unpaid",
-      status: "pending",
-      discountCode: v.discountCode,
+      orderNumber,
+      ...customer,
+      items: lines,
+      totalItems,
       subtotal,
-      discount,
-      shipping,
-      total,
-    });
+      shippingCharges: SHIPPING,
+      total: subtotal + SHIPPING,
+    })
 
     return NextResponse.json(
-      { orderId: order.orderNumber,  token: order.tokenNumber, total },
+      {
+        message: 'Order created',
+        order: { orderNumber: order.orderNumber, total: order.total, totalItems: order.totalItems },
+      },
       { status: 201 }
-    );
-  } catch (err) {
-    // put reserved stock back if anything failed after reserving
-    await Promise.all(
-      reserved.map((l) => Product.updateOne({ _id: l.product }, { $inc: { stock: l.quantity } }).catch(() => {}))
-    );
-
-    if (err instanceof OrderError) {
-      return NextResponse.json({ message: err.message }, { status: err.status });
+    )
+  } catch (error) {
+    // If anything failed after stock was reduced, put it back.
+    if (reserved.length) {
+      try {
+        await restoreStock(reserved)
+      } catch (rollbackError) {
+        console.error('Stock rollback failed:', rollbackError)
+      }
     }
-    console.error("POST /api/orders failed:", err);
-    return NextResponse.json({ message: "Something went wrong. Please try again." }, { status: 500 });
+
+    if (error instanceof OrderError) {
+      return NextResponse.json({ message: error.message }, { status: error.status })
+    }
+    console.error('Order error:', error)
+    return NextResponse.json({ message: 'Something went wrong. Please try again.' }, { status: 500 })
+  }
+}
+
+
+
+
+const STATUSES = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled']
+const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+ 
+// GET /api/admin/orders?q=&status=&page=1&limit=20
+export async function GET(req) {
+ 
+ 
+  try {
+    await connectDB()
+    const { searchParams } = new URL(req.url)
+ 
+    const q = (searchParams.get('q') || '').trim()
+    const status = searchParams.get('status') || ''
+    const page = Math.max(1, parseInt(searchParams.get('page')) || 1)
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit')) || 20))
+ 
+    const filter = {}
+    if (STATUSES.includes(status)) filter.status = status
+ 
+    if (q) {
+      const cleaned = q.replace('#', '')
+      if (/^\d+$/.test(cleaned)) {
+        filter.orderNumber = Number(cleaned)
+      } else {
+        const rx = new RegExp(escapeRegex(q), 'i')
+        filter.$or = [{ firstName: rx }, { lastName: rx }, { email: rx }, { phone: rx }, { city: rx }]
+      }
+    }
+ 
+    const [orders, total, grouped] = await Promise.all([
+      Order.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
+      Order.countDocuments(filter),
+      // Stats ignore search/filter so the cards always show the whole store
+      Order.aggregate([{ $group: { _id: '$status', count: { $sum: 1 }, revenue: { $sum: '$total' } } }]),
+    ])
+ 
+    const stats = { all: 0, revenue: 0 }
+    STATUSES.forEach((s) => (stats[s] = 0))
+    for (const g of grouped) {
+      stats[g._id] = g.count
+      stats.all += g.count
+      if (g._id !== 'cancelled') stats.revenue += g.revenue
+    }
+ 
+    return NextResponse.json({
+      orders,
+      stats,
+      page,
+      pages: Math.max(1, Math.ceil(total / limit)),
+      total,
+    })
+  } catch (error) {
+    console.error('Admin orders error:', error)
+    return NextResponse.json({ message: 'Could not load orders' }, { status: 500 })
   }
 }

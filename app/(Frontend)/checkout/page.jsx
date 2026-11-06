@@ -1,289 +1,270 @@
 "use client"
 
+import { useState } from 'react'
+import Link from 'next/link'
+import Image from 'next/image'
+import { useSelector, useDispatch } from 'react-redux'
+import axios from 'axios'
+import { ToastContainer, toast } from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
+
 import CheckBox1 from '@/components/CheckBox1'
 import InputFields from '@/components/checkout/InputFields'
 import Radio from '@/components/checkout/Radio'
-import { useState, useEffect } from 'react'
-import Link from 'next/link'
-import React from 'react'
-import { useSelector } from 'react-redux'
-import { selectCartCount, selectCartItems, selectCartTotal } from '@/app/redux/cartSlice'
-import Image from 'next/image'
-import { ToastContainer, toast } from 'react-toastify'
+import { selectCartCount, selectCartItems, selectCartTotal, clearCart } from '@/app/redux/cartSlice'
 
+const SHIPPING = 350
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-const page = () => {
+const initialForm = {
+  email: "",
+  country: "pakistan",
+  firstName: "",
+  lastName: "",
+  address: "",
+  apartment: "",
+  city: "",
+  postalCode: "",
+  phone: "",
+  payment: "",
+}
 
-  const itemsData = useSelector(selectCartItems)
+const rs = (n) => `Rs ${Number(n).toLocaleString('en-PK')}`
+
+// ---------- Order summary (shared by mobile + desktop) ----------
+const OrderSummary = ({ items, count, total }) => (
+  <div className="flex flex-col gap-4">
+    {items.map((item) => (
+      <div key={item._id} className="flex items-center gap-4">
+        <div className="relative h-16 w-16 shrink-0 rounded-lg border border-gray-300 bg-white">
+          <Image
+            src={item.image?.file || "/imageholder.png"}
+            alt={item.title}
+            fill
+            sizes="64px"
+            className="rounded-lg object-cover"
+          />
+          <span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-gray-700 px-1 text-xs text-white">
+            {item.quantity}
+          </span>
+        </div>
+        <p className="flex-1 text-sm font-medium text-gray-900">{item.title}</p>
+        <p className="text-sm text-gray-900">{rs(item.price * item.quantity)}</p>
+      </div>
+    ))}
+
+    <div className="mt-2 flex flex-col gap-2 text-sm text-gray-700">
+      <div className="flex justify-between">
+        <span>Subtotal · {count} {count === 1 ? 'item' : 'items'}</span>
+        <span className="text-gray-900">{rs(total)}</span>
+      </div>
+      <div className="flex justify-between">
+        <span>Shipping</span>
+        <span className="text-gray-900">{rs(SHIPPING)}</span>
+      </div>
+      <div className="mt-2 flex items-baseline justify-between text-gray-900">
+        <span className="text-base font-semibold">Total</span>
+        <span className="text-xl font-semibold">
+          <span className="mr-2 text-xs font-normal text-gray-500">PKR</span>
+          {rs(total + SHIPPING)}
+        </span>
+      </div>
+    </div>
+  </div>
+)
+
+const Checkout = () => {
+  const dispatch = useDispatch()
+  const items = useSelector(selectCartItems)
   const cartCount = useSelector(selectCartCount)
   const cartTotal = useSelector(selectCartTotal)
 
-  const [OrderData, setOrderData] = useState({
-    email: "",
-    country: "pakistan",
-    firstName: "",
-    lastName: "",
-    address: "",
-    optionalAdress: "",
-    city: "",
-    postalCode: "",
-    phone: 1,
-    shippingCharges: 350,
-    payment: "",
-    products: [],
-    totalItems: 1,
-    totalAmmount: 1
-
-
-  })
-
-
-  useEffect(() => {
-    OrderData.products = itemsData
-    OrderData.totalItems = cartCount
-    OrderData.totalAmmount = cartTotal
-
-
-
-
-  }, [itemsData, cartCount, cartTotal])
-
-
+  const [form, setForm] = useState(initialForm)
+  const [loading, setLoading] = useState(false)
+  const [summaryOpen, setSummaryOpen] = useState(false)
+  const [placedOrder, setPlacedOrder] = useState(null)
 
   const changeHandler = (e) => {
     const { name, value } = e.target
-
-    setOrderData((prev) => ({ ...prev, [name]: value }))
+    setForm((prev) => ({ ...prev, [name]: value }))
   }
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const validate = () => {
+    if (!items.length) return "Your cart is empty"
+    if (!form.email.trim()) return "Please enter your email"
+    if (!EMAIL_REGEX.test(form.email)) return "Please enter a valid email"
+    if (!form.firstName.trim()) return "Please enter your first name"
+    if (!form.lastName.trim()) return "Please enter your last name"
+    if (!form.address.trim()) return "Please enter your address"
+    if (!form.city.trim()) return "Please enter your city"
+    if (!form.phone.trim()) return "Please enter your phone number"
+    if (!form.payment.trim()) return "Please select a payment method"
+    return null
+  }
 
-  // Order Placing FUnction 
+  const submitHandler = async () => {
+    if (loading) return
+    const problem = validate()
+    if (problem) return toast.warning(problem)
 
-  const submitHandler = () => {
-    console.log("may chla")
-    if (!OrderData.email.trim()) {
-      return toast.warning("Please enter  email")
-    }
-    if (!emailRegex.test(OrderData.email)) {
-      return toast.warning("please enter valid email")
-    }
-    if (!OrderData.country.trim()) {
-      return toast.warning("Please select  country")
-    }
-    if (!OrderData.firstName.trim()) {
-      return toast.warning("Please enter  First Name")
-    }
-    if (!OrderData.lastName.trim()) {
-      return toast.warning("Please enter  Last Name")
-    }
-    if (!OrderData.address.trim()) {
-      return toast.warning("Please enter  address")
-    }
-    if (!OrderData.city.trim()) {
-      return toast.warning("Please enter  city")
-    }
-    if (!OrderData.payment.trim()) {
-      return toast.warning("Please select payment option")
-    }
+    setLoading(true)
+    try {
+      // Only send product ids + quantities. The server looks up the real
+      // prices and stock, so the client can't tamper with the total.
+      const payload = {
+        ...form,
+        items: items.map((i) => ({ _id: i._id, quantity: i.quantity })),
+      }
+      const { data } = await axios.post("/api/orders", payload)
 
-    toast.success("Order ceated")
-    setOrderData({
-      email: "",
-      country: "pakistan",
-      firstName: "",
-      lastName: "",
-      address: "",
-      optionalAdress: "",
-      city: "",
-      postalCode: "",
-      phone: 1,
-      shippingCharges: 350,
-      payment: "",
-      products: [],
-      totalItems: 1,
-      totalAmmount: 1
-
-
+      setPlacedOrder(data.order)
+      setForm(initialForm)
+      dispatch(clearCart())
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Could not place your order. Please try again.")
+    } finally {
+      setLoading(false)
     }
+  }
+
+  // ---------- Confirmation ----------
+  if (placedOrder) {
+    return (
+      <div className="mx-auto flex min-h-[70vh] max-w-lg flex-col items-center justify-center gap-3 px-6 text-center">
+        <h1 className="text-2xl font-semibold text-gray-900">Thank you, your order is placed</h1>
+        <p className="text-gray-600">
+          Order <span className="font-semibold text-gray-900">#{placedOrder.orderNumber}</span> is confirmed.
+          We&apos;ll contact you on the phone number you gave to arrange delivery.
+        </p>
+        <p className="text-sm text-gray-600">Total to pay: {rs(placedOrder.total)}</p>
+        <Link href="/" className="mt-4 rounded-md bg-blue-600 px-6 py-3 text-sm font-medium text-white hover:bg-blue-700">
+          Continue shopping
+        </Link>
+        <ToastContainer />
+      </div>
     )
-
-
   }
 
-
+  // ---------- Empty cart ----------
+  if (!items.length) {
+    return (
+      <div className="mx-auto flex min-h-[70vh] max-w-lg flex-col items-center justify-center gap-3 px-6 text-center">
+        <h1 className="text-2xl font-semibold text-gray-900">Your cart is empty</h1>
+        <p className="text-gray-600">Add something to your cart before checking out.</p>
+        <Link href="/" className="mt-2 rounded-md bg-blue-600 px-6 py-3 text-sm font-medium text-white hover:bg-blue-700">
+          Browse products
+        </Link>
+        <ToastContainer />
+      </div>
+    )
+  }
 
   return (
-    <div className="flex justify-between ">
-
-      {/* left div  */}
-      <div className="px-4 py-2  w-[48%] ">
-
-        {/* Contact div  */}
-        <div className='flex flex-col gap-1'>
-          {/* heading  */}
-          <div className="flex justify-between items-center">
-            <p className="text-xl font-semibold ">Contact</p>
-            <Link href={'/'}>
-              <p className='text-blue-400 cursor-pointer underline text-sm'>Sign in</p>
-            </Link>
+    <div className="min-h-screen lg:grid lg:grid-cols-2">
+      {/* ===== Mobile order summary toggle (hidden on desktop) ===== */}
+      <div className="border-b border-gray-300 bg-[#F5F5F5] lg:hidden">
+        <button
+          type="button"
+          onClick={() => setSummaryOpen((o) => !o)}
+          aria-expanded={summaryOpen}
+          className="flex w-full items-center justify-between px-4 py-4 text-sm text-blue-600"
+        >
+          <span>{summaryOpen ? 'Hide order summary' : 'Show order summary'}</span>
+          <span className="text-base font-semibold text-gray-900">{rs(cartTotal + SHIPPING)}</span>
+        </button>
+        {summaryOpen && (
+          <div className="px-4 pb-6">
+            <OrderSummary items={items} count={cartCount} total={cartTotal} />
           </div>
+        )}
+      </div>
 
-          {/* Input Fields  */}
-          <div>
-            <InputFields placeholder={"email"} name={"email"} value={OrderData.email} handler={changeHandler} type={"email"} />
-            <div className='flex gap-1 items-center text-sm'>
+      {/* ===== Left: form ===== */}
+      <div className="px-4 py-6 sm:px-8 lg:flex lg:justify-end lg:px-12 lg:py-12">
+        <div className="w-full max-w-[560px]">
+          {/* Contact */}
+          <section className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Contact</h2>
+              <Link href="/" className="text-sm text-blue-600 underline">Sign in</Link>
+            </div>
+            <InputFields placeholder="Email" name="email" value={form.email} handler={changeHandler} type="email" />
+            <div className="flex items-center gap-2 text-sm">
               <CheckBox1 id="news" />
               <label htmlFor="news">Email me with news and offers</label>
-
             </div>
+          </section>
 
+          {/* Delivery */}
+          <section className="mt-8 flex flex-col gap-3">
+            <h2 className="text-xl font-semibold">Delivery</h2>
 
-          </div>
-        </div>
-
-        {/* Delivery  */}
-        <div className='flex flex-col gap-1 mt-4'>
-          {/* heading  */}
-          <div className="flex justify-between items-center">
-            <p className='text-xl font-semibold'>Delivery</p>
-          </div>
-
-          {/* Input Fields  */}
-          <div>
-            {/* Select Fields  */}
-            <select name="country" id="" value={OrderData.country} onChange={changeHandler} className="w-full border  px-2 py-3  ">
-              <option value="pakistan"  >Pakistan</option>
-
+            <select
+              name="country"
+              value={form.country}
+              onChange={changeHandler}
+              className="w-full rounded-md border border-gray-300 bg-white px-3 py-3 text-sm"
+            >
+              <option value="pakistan">Pakistan</option>
             </select>
 
-            {/* Names  */}
-            <div className="flex items-center   gap-1 w-full mt-3">
-              <div className='w-[50%]'>
-                <InputFields placeholder={"First name"} handler={changeHandler} value={OrderData.firstName} type={"text"} name={"firstName"} />
-
-              </div>
-              <div className='w-[50%]'>
-                <InputFields placeholder={"Last name"} handler={changeHandler} value={OrderData.lastName} type={"text"} name={"lastName"} />
-              </div>
-
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <InputFields placeholder="First name" name="firstName" value={form.firstName} handler={changeHandler} type="text" />
+              <InputFields placeholder="Last name" name="lastName" value={form.lastName} handler={changeHandler} type="text" />
             </div>
 
-            {/* Address  */}
-            <div className='mt-3'>
-              <InputFields placeholder={"Address"} type={"text"} name={"address"} handler={changeHandler} value={OrderData.address} />
+            <InputFields placeholder="Address" name="address" value={form.address} handler={changeHandler} type="text" />
+            <InputFields placeholder="Apartment, suite, etc. (optional)" name="apartment" value={form.apartment} handler={changeHandler} type="text" />
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <InputFields placeholder="City" name="city" value={form.city} handler={changeHandler} type="text" />
+              <InputFields placeholder="Postal code (optional)" name="postalCode" value={form.postalCode} handler={changeHandler} type="text" />
             </div>
 
-            {/* Address  */}
-            <div className='mt-3'>
-              <InputFields placeholder={"Address"} type={"text"} name={"Apartment, suite, stc. (optional)"} handler={changeHandler} value={OrderData.optionalAdress} />
+            <InputFields placeholder="Phone" name="phone" value={form.phone} handler={changeHandler} type="tel" />
+
+            <div className="flex items-center gap-2 text-sm">
+              <CheckBox1 id="save-info" />
+              <label htmlFor="save-info">Save this information for next time</label>
             </div>
+          </section>
 
-            {/* City  */}
-            <div className="flex items-center   gap-1 w-full mt-3">
-              <div className='w-[50%]'>
-                <InputFields placeholder={"City"} type={"text"} name={"city"} handler={changeHandler} value={OrderData.city} />
-
-              </div>
-              <div className='w-[50%]'>
-                <InputFields placeholder={"Postal Code"} type={"text"} name={"postalcode"} value={OrderData.postalCode} handler={changeHandler} />
-              </div>
-
+          {/* Shipping method */}
+          <section className="mt-8 flex flex-col gap-3">
+            <h2 className="text-xl font-semibold">Shipping method</h2>
+            <div className="flex items-center justify-between rounded-md border border-blue-600 bg-blue-50 px-4 py-3 text-sm">
+              <span>Standard</span>
+              <span className="font-medium">{rs(SHIPPING)}</span>
             </div>
+          </section>
 
+          {/* Payment */}
+          <section className="mt-8 flex flex-col gap-3">
+            <h2 className="text-xl font-semibold">Payment</h2>
+            <Radio handler={changeHandler} name="payment" value={form.payment} />
+          </section>
 
-            {/* Phone  */}
-            <div className='mt-3'>
-              <InputFields placeholder={"Phone"} type={"number"} name={"phone"} handler={changeHandler} value={OrderData.phone} />
-            </div>
-
-            {/* Save option  */}
-            <div className='mt-1 text-sm flex items-center gap-1'>
-              <CheckBox1 />
-              <label htmlFor="">Save this information for next time</label>
-            </div>
-
-            {/* Shipping Method  */}
-
-            <div className='flex justify-between border border-gray-300 px-4 py-1 rounded-lg mt-6'>
-              <p>Standard</p>
-              <p>Rs 350</p>
-            </div>
-
-
-            {/* Payment  */}
-            <div className="mt-6">
-              <Radio handler={changeHandler} name={"payment"} value={OrderData.payment} />
-
-            </div>
-
-
-
-
-          </div>
+          <button
+            type="button"
+            onClick={submitHandler}
+            disabled={loading}
+            className="mt-8 w-full rounded-md bg-blue-600 px-4 py-4 text-base font-semibold text-white transition hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loading ? 'Placing order…' : 'Complete order'}
+          </button>
         </div>
-
-        {/* Complete  */}
-        <div className="mt-6">
-          <button onClick={submitHandler} className="w-full bg-blue-400 py-1 px-4">Complete Order</button>
-        </div>
-
       </div>
 
-      {/* RIgth DIv  */}
-      <div className="w-[48%] bg-[#F5F5F5]  py-2 ">
-
-        {/* Main div  */}
-        <div className="px-8 mt-6 ">
-
-          {itemsData.map((e) => {
-            return <div key={e._id} className="flex gap-4 justify-between items-center mt-4  md:max-w-[380px]">
-              {/* Image div  */}
-              <div className='relative w-[60px] h-[60px] border-2 rounded-xl flex justify-center items-center border-white'>
-                <Image src={e.image.file || "/imageholder.png"} width={50} height={50} alt='logo' />
-                <div className='absolute p-1 top-0 right-0 w-4 h-4 rounded-full flex justify-center items-center text-sm bg-black text-white'>
-                  {e.quantity}
-                </div>
-              </div>
-              {/* Title div  */}
-              <div className='w-[180px]'>
-                <p className='text-sm font-semibold'>{e.title}</p>
-              </div>
-              {/* Price  */}
-              <div>
-                <p>Rs {e.price}.00</p>
-              </div>
-
-            </div>
-          })}
-
-
-
-          <div className='flex flex-col gap-2 mt-6 md:max-w-[380px]'>
-            <div className='flex justify-between'>
-              <p>Subtotal . {cartCount} items</p>
-              <p>Rs {cartTotal}.00</p>
-            </div>
-
-            <div className='flex justify-between'>
-              <p>Shipping</p>
-              <p>Rs 350</p>
-            </div>
-
-
-            <div className='flex justify-between'>
-              <p>Total</p>
-              <p>Rs {cartTotal + 350}</p>
-            </div>
-          </div>
-
+      {/* ===== Right: summary (desktop only) ===== */}
+      <aside className="hidden border-l border-gray-300 bg-[#F5F5F5] lg:block">
+        <div className="sticky top-0 max-w-[460px] px-12 py-12">
+          <OrderSummary items={items} count={cartCount} total={cartTotal} />
         </div>
+      </aside>
 
-      </div>
-      <ToastContainer />
-
+      <ToastContainer position="top-center" />
     </div>
   )
 }
 
-export default page
+export default Checkout
